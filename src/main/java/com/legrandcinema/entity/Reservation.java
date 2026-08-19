@@ -7,40 +7,41 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
-@Table(name = "places")
+@Table(name = "reservations")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Place {
+public class Reservation {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "utilisateur_id", nullable = false)
+    private Utilisateur utilisateur;
+
+    @ManyToOne
     @JoinColumn(name = "seance_id", nullable = false)
     private Seance seance;
 
-    @ManyToOne
-    @JoinColumn(name = "reservation_id")
-    private Reservation reservation;
-
-    @Column(nullable = false)
-    private String numero; // ex: "A12"
+    @OneToMany(mappedBy = "reservation")
+    private List<Place> places;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private StatutPlace statut;
+    private StatutReservation statut;
 
-    private LocalDateTime verrouilleeJusqua;
+    @Column(nullable = false)
+    private LocalDateTime dateReservation;
 
-    public enum StatutPlace {
-        LIBRE,
-        VERROUILLEE,
-        RESERVEE,
-        BLOQUEE
+    public enum StatutReservation {
+        EN_ATTENTE_PAIEMENT,
+        PAYEE,
+        ANNULEE
     }
 }
