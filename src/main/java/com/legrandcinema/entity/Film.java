@@ -22,9 +22,9 @@ public class Film {
     private String titre;
 
     @Column(nullable = false)
-    private Integer duree; // en minutes
+    private Integer duree;
 
-    private String affiche; // URL de l'image de l'affiche
+    private String affiche;
 
     @Column(length = 1000)
     private String description;
