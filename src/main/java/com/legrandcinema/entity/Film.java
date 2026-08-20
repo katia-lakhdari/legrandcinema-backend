@@ -22,6 +22,9 @@ public class Film {
     private String titre;
 
     @Column(nullable = false)
+    private String genre;
+
+    @Column(nullable = false)
     private Integer duree;
 
     private String affiche;
