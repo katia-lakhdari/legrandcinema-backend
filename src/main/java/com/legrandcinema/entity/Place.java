@@ -29,18 +29,15 @@ public class Place {
     private Reservation reservation;
 
     @Column(nullable = false)
-    private String numero; // ex: "A12"
+    private String numero;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private StatutPlace statut;
 
-    private LocalDateTime verrouilleeJusqua;
+    private LocalDateTime finVerrouillage;
 
     public enum StatutPlace {
-        LIBRE,
-        VERROUILLEE,
-        RESERVEE,
-        BLOQUEE
+        LIBRE, VERROUILLEE, RESERVEE, BLOQUEE
     }
 }
