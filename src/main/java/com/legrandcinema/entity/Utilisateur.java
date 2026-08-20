@@ -19,6 +19,9 @@ public class Utilisateur {
     private Long id;
 
     @Column(nullable = false)
+    private String prenom;
+
+    @Column(nullable = false)
     private String nom;
 
     @Column(nullable = false, unique = true)
@@ -28,7 +31,6 @@ public class Utilisateur {
     private String motDePasse;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Role role;
 
     public enum Role {
