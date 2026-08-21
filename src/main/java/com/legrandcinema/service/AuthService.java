@@ -7,6 +7,7 @@ import com.legrandcinema.repository.UtilisateurRepository;
 import com.legrandcinema.security.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.legrandcinema.dto.request.ConnexionRequest;
 
 @Service
 public class AuthService {
@@ -34,6 +35,19 @@ public class AuthService {
         utilisateur.setRole(Utilisateur.Role.CLIENT);
 
         utilisateurRepository.save(utilisateur);
+
+        String token = jwtUtil.genererToken(utilisateur.getEmail(), utilisateur.getRole().name());
+
+        return new AuthResponse(token, utilisateur.getEmail(), utilisateur.getRole().name());
+    }
+
+    public AuthResponse connecter(ConnexionRequest requete) {
+        Utilisateur utilisateur = utilisateurRepository.findByEmail(requete.getEmail())
+                .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
+
+        if (!passwordEncoder.matches(requete.getMotDePasse(), utilisateur.getMotDePasse())) {
+            throw new RuntimeException("Email ou mot de passe incorrect");
+        }
 
         String token = jwtUtil.genererToken(utilisateur.getEmail(), utilisateur.getRole().name());
 
