@@ -1,0 +1,122 @@
+package com.legrandcinema.service;
+
+import com.legrandcinema.entity.Place;
+import com.legrandcinema.entity.Place.StatutPlace;
+import com.legrandcinema.repository.PlaceRepository;
+import com.legrandcinema.exception.ResourceNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class PlaceServiceTest {
+
+    @Mock
+    private PlaceRepository placeRepository;
+
+    @InjectMocks
+    private PlaceService placeService;
+
+    private Place place;
+
+    @BeforeEach
+    void initialisation() {
+        place = new Place();
+        place.setId(1L);
+        place.setNumero("A12");
+        place.setStatut(StatutPlace.LIBRE);
+    }
+
+    @Test
+    void verrouillerPlace_placeLibre_verrouilleAvecSucces() {
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Place resultat = placeService.verrouillerPlace(1L);
+
+        assertEquals(StatutPlace.VERROUILLEE, resultat.getStatut());
+        assertNotNull(resultat.getFinVerrouillage());
+        assertTrue(resultat.getFinVerrouillage().isAfter(LocalDateTime.now()));
+    }
+
+    @Test
+    void verrouillerPlace_placeReservee_leveException() {
+        place.setStatut(StatutPlace.RESERVEE);
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.verrouillerPlace(1L));
+
+        assertEquals("Cette place est déjà réservée", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void verrouillerPlace_placeVerrouilleeNonExpiree_leveException() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(3));
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.verrouillerPlace(1L));
+
+        assertEquals("Cette place est déjà en cours de sélection par un autre client", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void verrouillerPlace_placeVerrouilleeExpiree_verrouilleAvecSucces() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Place resultat = placeService.verrouillerPlace(1L);
+
+        assertEquals(StatutPlace.VERROUILLEE, resultat.getStatut());
+        assertTrue(resultat.getFinVerrouillage().isAfter(LocalDateTime.now()));
+    }
+
+    @Test
+    void verrouillerPlace_placeInexistante_leveResourceNotFoundException() {
+        when(placeRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> placeService.verrouillerPlace(99L));
+    }
+
+    @Test
+    void libererPlace_placeVerrouillee_repasseLibre() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Place resultat = placeService.libererPlace(1L);
+
+        assertEquals(StatutPlace.LIBRE, resultat.getStatut());
+        assertNull(resultat.getFinVerrouillage());
+    }
+
+    @Test
+    void listerPlacesParSeance_placeExpiree_estLibereeAutomatiquement() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
+        when(placeRepository.findBySeanceId(10L)).thenReturn(List.of(place));
+
+        List<Place> resultat = placeService.listerPlacesParSeance(10L);
+
+        assertEquals(StatutPlace.LIBRE, resultat.get(0).getStatut());
+        verify(placeRepository).save(place);
+    }
+}
