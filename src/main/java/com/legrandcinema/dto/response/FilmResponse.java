@@ -8,6 +8,7 @@ import lombok.Getter;
 public class FilmResponse {
     private Long id;
     private String titre;
+    private String genre;
     private Integer duree;
     private String affiche;
     private String description;
