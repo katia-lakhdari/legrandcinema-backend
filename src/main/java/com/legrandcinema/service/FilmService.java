@@ -26,6 +26,7 @@ public class FilmService {
     public Film creerFilm(FilmRequest request) {
         Film film = new Film();
         film.setTitre(request.getTitre());
+        film.setGenre(request.getGenre());
         film.setDuree(request.getDuree());
         film.setAffiche(request.getAffiche());
         film.setDescription(request.getDescription());
@@ -35,6 +36,7 @@ public class FilmService {
     public Film modifierFilm(Long id, FilmRequest request) {
         Film film = trouverParId(id);
         film.setTitre(request.getTitre());
+        film.setGenre(request.getGenre());
         film.setDuree(request.getDuree());
         film.setAffiche(request.getAffiche());
         film.setDescription(request.getDescription());
