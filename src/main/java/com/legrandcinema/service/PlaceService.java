@@ -1,7 +1,9 @@
 package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Place;
+import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.repository.PlaceRepository;
+import com.legrandcinema.repository.UtilisateurRepository;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,9 @@ public class PlaceService {
     @Autowired
     private PlaceRepository placeRepository;
 
+    @Autowired
+    private UtilisateurRepository utilisateurRepository;
+
     public List<Place> listerPlacesParSeance(Long seanceId) {
         List<Place> places = placeRepository.findBySeanceId(seanceId);
         for (Place place : places) {
@@ -23,7 +28,7 @@ public class PlaceService {
         return places;
     }
 
-    public Place verrouillerPlace(Long id) {
+    public Place verrouillerPlace(Long id, String emailUtilisateur) {
         Place place = trouverParId(id);
 
         if (place.getStatut() == Place.StatutPlace.RESERVEE) {
@@ -36,8 +41,12 @@ public class PlaceService {
             throw new RuntimeException("Cette place est déjà en cours de sélection par un autre client");
         }
 
+        Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
         place.setStatut(Place.StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(5));
+        place.setUtilisateurVerrouillage(utilisateur);
         return placeRepository.save(place);
     }
 
@@ -45,6 +54,7 @@ public class PlaceService {
         Place place = trouverParId(id);
         place.setStatut(Place.StatutPlace.LIBRE);
         place.setFinVerrouillage(null);
+        place.setUtilisateurVerrouillage(null);
         return placeRepository.save(place);
     }
 
@@ -61,6 +71,7 @@ public class PlaceService {
         if (estVerrouillee && estExpiree) {
             place.setStatut(Place.StatutPlace.LIBRE);
             place.setFinVerrouillage(null);
+            place.setUtilisateurVerrouillage(null);
             placeRepository.save(place);
         }
     }

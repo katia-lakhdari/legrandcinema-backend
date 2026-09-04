@@ -2,7 +2,9 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Place.StatutPlace;
+import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.repository.PlaceRepository;
+import com.legrandcinema.repository.UtilisateurRepository;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,10 +26,14 @@ class PlaceServiceTest {
     @Mock
     private PlaceRepository placeRepository;
 
+    @Mock
+    private UtilisateurRepository utilisateurRepository;
+
     @InjectMocks
     private PlaceService placeService;
 
     private Place place;
+    private Utilisateur utilisateur;
 
     @BeforeEach
     void initialisation() {
@@ -35,18 +41,24 @@ class PlaceServiceTest {
         place.setId(1L);
         place.setNumero("A12");
         place.setStatut(StatutPlace.LIBRE);
+
+        utilisateur = new Utilisateur();
+        utilisateur.setId(1L);
+        utilisateur.setEmail("katia@legrandcinema.com");
     }
 
     @Test
     void verrouillerPlace_placeLibre_verrouilleAvecSucces() {
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
         when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
 
-        Place resultat = placeService.verrouillerPlace(1L);
+        Place resultat = placeService.verrouillerPlace(1L, "katia@legrandcinema.com");
 
         assertEquals(StatutPlace.VERROUILLEE, resultat.getStatut());
         assertNotNull(resultat.getFinVerrouillage());
         assertTrue(resultat.getFinVerrouillage().isAfter(LocalDateTime.now()));
+        assertEquals(utilisateur, resultat.getUtilisateurVerrouillage());
     }
 
     @Test
@@ -55,7 +67,7 @@ class PlaceServiceTest {
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
         RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> placeService.verrouillerPlace(1L));
+                () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place est déjà réservée", exception.getMessage());
         verify(placeRepository, never()).save(any());
@@ -68,7 +80,7 @@ class PlaceServiceTest {
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
         RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> placeService.verrouillerPlace(1L));
+                () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place est déjà en cours de sélection par un autre client", exception.getMessage());
         verify(placeRepository, never()).save(any());
@@ -79,9 +91,10 @@ class PlaceServiceTest {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
         when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
 
-        Place resultat = placeService.verrouillerPlace(1L);
+        Place resultat = placeService.verrouillerPlace(1L, "katia@legrandcinema.com");
 
         assertEquals(StatutPlace.VERROUILLEE, resultat.getStatut());
         assertTrue(resultat.getFinVerrouillage().isAfter(LocalDateTime.now()));
@@ -92,7 +105,7 @@ class PlaceServiceTest {
         when(placeRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> placeService.verrouillerPlace(99L));
+                () -> placeService.verrouillerPlace(99L, "katia@legrandcinema.com"));
     }
 
     @Test

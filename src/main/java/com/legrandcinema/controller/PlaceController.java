@@ -4,6 +4,7 @@ import com.legrandcinema.entity.Place;
 import com.legrandcinema.dto.response.PlaceResponse;
 import com.legrandcinema.service.PlaceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -28,8 +29,8 @@ public class PlaceController {
     }
 
     @PostMapping("/{id}/verrouiller")
-    public PlaceResponse verrouillerPlace(@PathVariable Long id) {
-        Place place = placeService.verrouillerPlace(id);
+    public PlaceResponse verrouillerPlace(@PathVariable Long id, Authentication authentication) {
+        Place place = placeService.verrouillerPlace(id, authentication.getName());
         return new PlaceResponse(place.getId(), place.getNumero(),
                 place.getStatut().name(), place.getFinVerrouillage());
     }
