@@ -4,6 +4,7 @@ import com.legrandcinema.dto.request.ConnexionRequest;
 import com.legrandcinema.dto.request.InscriptionRequest;
 import com.legrandcinema.dto.response.AuthResponse;
 import com.legrandcinema.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,12 +21,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse inscrire(@RequestBody InscriptionRequest requete) {
+    public AuthResponse inscrire(@Valid @RequestBody InscriptionRequest requete) {
         return authService.inscrire(requete);
     }
 
     @PostMapping("/login")
-    public AuthResponse connecter(@RequestBody ConnexionRequest requete) {
+    public AuthResponse connecter(@Valid @RequestBody ConnexionRequest requete) {
         return authService.connecter(requete);
     }
 }

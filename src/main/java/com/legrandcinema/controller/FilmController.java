@@ -4,6 +4,7 @@ import com.legrandcinema.dto.request.FilmRequest;
 import com.legrandcinema.dto.response.FilmResponse;
 import com.legrandcinema.entity.Film;
 import com.legrandcinema.service.FilmService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,13 +34,13 @@ public class FilmController {
     }
 
     @PostMapping
-    public FilmResponse creerFilm(@RequestBody FilmRequest request) {
+    public FilmResponse creerFilm(@Valid @RequestBody FilmRequest request) {
         Film film = filmService.creerFilm(request);
         return new FilmResponse(film.getId(), film.getTitre(), film.getGenre(), film.getDuree(), film.getAffiche(), film.getDescription());
     }
 
     @PutMapping("/{id}")
-    public FilmResponse modifierFilm(@PathVariable Long id, @RequestBody FilmRequest request) {
+    public FilmResponse modifierFilm(@PathVariable Long id, @Valid @RequestBody FilmRequest request) {
         Film film = filmService.modifierFilm(id, request);
         return new FilmResponse(film.getId(), film.getTitre(), film.getGenre(), film.getDuree(), film.getAffiche(), film.getDescription());
     }
