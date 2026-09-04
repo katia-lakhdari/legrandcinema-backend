@@ -4,6 +4,7 @@ import com.legrandcinema.entity.Seance;
 import com.legrandcinema.service.SeanceService;
 import com.legrandcinema.dto.request.SeanceRequest;
 import com.legrandcinema.dto.response.SeanceResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -32,14 +33,14 @@ public class SeanceController {
     }
 
     @PostMapping
-    public SeanceResponse creerSeance(@RequestBody SeanceRequest request) {
+    public SeanceResponse creerSeance(@Valid @RequestBody SeanceRequest request) {
         Seance seance = seanceService.creerSeance(request);
         return new SeanceResponse(seance.getId(), seance.getFilm().getTitre(),
                 seance.getSalle().getNom(), seance.getDateHeure());
     }
 
     @PutMapping("/{id}")
-    public SeanceResponse modifierSeance(@PathVariable Long id, @RequestBody SeanceRequest request) {
+    public SeanceResponse modifierSeance(@PathVariable Long id, @Valid @RequestBody SeanceRequest request) {
         Seance seance = seanceService.modifierSeance(id, request);
         return new SeanceResponse(seance.getId(), seance.getFilm().getTitre(),
                 seance.getSalle().getNom(), seance.getDateHeure());

@@ -3,6 +3,7 @@ package com.legrandcinema.exception;
 import com.legrandcinema.dto.response.ErreurResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -13,6 +14,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErreurResponse> gererRessourceIntrouvable(ResourceNotFoundException exception) {
         ErreurResponse erreur = new ErreurResponse(exception.getMessage(), HttpStatus.NOT_FOUND.value());
         return new ResponseEntity<>(erreur, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErreurResponse> gererErreurValidation(MethodArgumentNotValidException exception) {
+        String message = exception.getBindingResult()
+                .getFieldErrors()
+                .get(0)
+                .getDefaultMessage();
+        ErreurResponse erreur = new ErreurResponse(message, HttpStatus.BAD_REQUEST.value());
+        return new ResponseEntity<>(erreur, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(RuntimeException.class)
