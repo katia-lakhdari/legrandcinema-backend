@@ -28,6 +28,10 @@ public class Place {
     @JoinColumn(name = "reservation_id")
     private Reservation reservation;
 
+    @ManyToOne
+    @JoinColumn(name = "utilisateur_verrouillage_id")
+    private Utilisateur utilisateurVerrouillage;
+
     @Column(nullable = false)
     private String numero;
 
