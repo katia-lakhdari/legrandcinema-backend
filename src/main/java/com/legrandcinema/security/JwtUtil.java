@@ -2,6 +2,8 @@ package com.legrandcinema.security;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -10,11 +12,17 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    private final SecretKey secretKey = Keys.hmacShaKeyFor(
-            "cleSecreteLeGrandCinemaChangezMoiEnProduction123".getBytes()
-    );
+    @Value("${jwt.secret}")
+    private String cleSecrete;
+
+    private SecretKey secretKey;
 
     private final long dureeValiditeMs = 3600000;
+
+    @PostConstruct
+    public void init() {
+        secretKey = Keys.hmacShaKeyFor(cleSecrete.getBytes());
+    }
 
     public String genererToken(String email, String role) {
         Date maintenant = new Date();
