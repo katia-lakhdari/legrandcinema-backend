@@ -43,6 +43,7 @@ public class SeanceService {
         seance.setFilm(film);
         seance.setSalle(salle);
         seance.setDateHeure(request.getDateHeure());
+        seance.setPrix(request.getPrix());
         return seanceRepository.save(seance);
     }
 
@@ -56,6 +57,7 @@ public class SeanceService {
         seance.setFilm(film);
         seance.setSalle(salle);
         seance.setDateHeure(request.getDateHeure());
+        seance.setPrix(request.getPrix());
         return seanceRepository.save(seance);
     }
 

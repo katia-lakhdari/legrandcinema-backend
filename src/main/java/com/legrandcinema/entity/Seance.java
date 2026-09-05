@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,4 +31,7 @@ public class Seance {
 
     @Column(nullable = false)
     private LocalDateTime dateHeure;
+
+    @Column(nullable = false)
+    private BigDecimal prix;
 }
