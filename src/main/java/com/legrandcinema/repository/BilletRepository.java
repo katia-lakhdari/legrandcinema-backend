@@ -4,4 +4,5 @@ import com.legrandcinema.entity.Billet;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BilletRepository extends JpaRepository<Billet, Long> {
+    boolean existsByReservationId(Long reservationId);
 }
