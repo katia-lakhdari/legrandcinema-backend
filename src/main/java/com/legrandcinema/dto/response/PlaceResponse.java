@@ -12,4 +12,5 @@ public class PlaceResponse {
     private String numero;
     private String statut;
     private LocalDateTime finVerrouillage;
+    private String raisonBlocage;
 }
