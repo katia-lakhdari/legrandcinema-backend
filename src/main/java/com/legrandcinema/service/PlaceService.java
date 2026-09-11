@@ -58,6 +58,36 @@ public class PlaceService {
         return placeRepository.save(place);
     }
 
+    public Place bloquerPlace(Long id, String raison) {
+        Place place = trouverParId(id);
+
+        if (place.getStatut() == Place.StatutPlace.RESERVEE) {
+            throw new RuntimeException("Impossible de bloquer une place déjà réservée");
+        }
+
+        libererSiExpiree(place);
+
+        if (place.getStatut() == Place.StatutPlace.VERROUILLEE) {
+            throw new RuntimeException("Impossible de bloquer une place en cours de sélection par un client");
+        }
+
+        place.setStatut(Place.StatutPlace.BLOQUEE);
+        place.setRaisonBlocage(raison);
+        return placeRepository.save(place);
+    }
+
+    public Place debloquerPlace(Long id) {
+        Place place = trouverParId(id);
+
+        if (place.getStatut() != Place.StatutPlace.BLOQUEE) {
+            throw new RuntimeException("Cette place n'est pas bloquée");
+        }
+
+        place.setStatut(Place.StatutPlace.LIBRE);
+        place.setRaisonBlocage(null);
+        return placeRepository.save(place);
+    }
+
     private Place trouverParId(Long id) {
         return placeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Place introuvable"));

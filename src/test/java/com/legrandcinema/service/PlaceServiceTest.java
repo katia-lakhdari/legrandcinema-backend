@@ -132,4 +132,85 @@ class PlaceServiceTest {
         assertEquals(StatutPlace.LIBRE, resultat.get(0).getStatut());
         verify(placeRepository).save(place);
     }
+
+    @Test
+    void bloquerPlace_placeLibre_bloqueAvecSucces() {
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Place resultat = placeService.bloquerPlace(1L, "Siège défectueux");
+
+        assertEquals(StatutPlace.BLOQUEE, resultat.getStatut());
+        assertEquals("Siège défectueux", resultat.getRaisonBlocage());
+    }
+
+    @Test
+    void bloquerPlace_placeReservee_leveException() {
+        place.setStatut(StatutPlace.RESERVEE);
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.bloquerPlace(1L, "Siège défectueux"));
+
+        assertEquals("Impossible de bloquer une place déjà réservée", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void bloquerPlace_placeVerrouilleeNonExpiree_leveException() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(3));
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.bloquerPlace(1L, "Siège défectueux"));
+
+        assertEquals("Impossible de bloquer une place en cours de sélection par un client", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void bloquerPlace_placeVerrouilleeExpiree_bloqueAvecSucces() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Place resultat = placeService.bloquerPlace(1L, "Siège cassé");
+
+        assertEquals(StatutPlace.BLOQUEE, resultat.getStatut());
+        assertEquals("Siège cassé", resultat.getRaisonBlocage());
+    }
+
+    @Test
+    void bloquerPlace_placeInexistante_leveResourceNotFoundException() {
+        when(placeRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> placeService.bloquerPlace(99L, "Siège défectueux"));
+    }
+
+    @Test
+    void debloquerPlace_placeBloquee_repasseLibre() {
+        place.setStatut(StatutPlace.BLOQUEE);
+        place.setRaisonBlocage("Siège défectueux");
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Place resultat = placeService.debloquerPlace(1L);
+
+        assertEquals(StatutPlace.LIBRE, resultat.getStatut());
+        assertNull(resultat.getRaisonBlocage());
+    }
+
+    @Test
+    void debloquerPlace_placeNonBloquee_leveException() {
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.debloquerPlace(1L));
+
+        assertEquals("Cette place n'est pas bloquée", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
 }

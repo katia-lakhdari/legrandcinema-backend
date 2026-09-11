@@ -41,6 +41,8 @@ public class Place {
 
     private LocalDateTime finVerrouillage;
 
+    private String raisonBlocage;
+
     public enum StatutPlace {
         LIBRE, VERROUILLEE, RESERVEE, BLOQUEE
     }
