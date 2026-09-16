@@ -34,6 +34,7 @@ class PlaceServiceTest {
 
     private Place place;
     private Utilisateur utilisateur;
+    private Utilisateur autreUtilisateur;
 
     @BeforeEach
     void initialisation() {
@@ -45,6 +46,10 @@ class PlaceServiceTest {
         utilisateur = new Utilisateur();
         utilisateur.setId(1L);
         utilisateur.setEmail("katia@legrandcinema.com");
+
+        autreUtilisateur = new Utilisateur();
+        autreUtilisateur.setId(2L);
+        autreUtilisateur.setEmail("autre@legrandcinema.com");
     }
 
     @Test
@@ -109,16 +114,86 @@ class PlaceServiceTest {
     }
 
     @Test
-    void libererPlace_placeVerrouillee_repasseLibre() {
+    void libererPlace_placeVerrouilleeParProprietaire_repasseLibre() {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
+        place.setUtilisateurVerrouillage(utilisateur);
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
         when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
 
-        Place resultat = placeService.libererPlace(1L);
+        Place resultat = placeService.libererPlace(1L, "katia@legrandcinema.com");
 
         assertEquals(StatutPlace.LIBRE, resultat.getStatut());
         assertNull(resultat.getFinVerrouillage());
+        assertNull(resultat.getUtilisateurVerrouillage());
+    }
+
+    @Test
+    void libererPlace_placeReservee_leveException() {
+        place.setStatut(StatutPlace.RESERVEE);
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
+
+        assertEquals("Cette place est déjà réservée et payée, impossible de la libérer", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void libererPlace_placeLibre_leveException() {
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
+
+        assertEquals("Cette place n'est pas verrouillée", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void libererPlace_placeVerrouilleeParAutreUtilisateur_leveException() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
+        place.setUtilisateurVerrouillage(utilisateur);
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(utilisateurRepository.findByEmail("autre@legrandcinema.com")).thenReturn(Optional.of(autreUtilisateur));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.libererPlace(1L, "autre@legrandcinema.com"));
+
+        assertEquals("Vous n'êtes pas autorisé à libérer cette place", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void libererPlace_placeVerrouilleeSansUtilisateur_leveException() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
+        place.setUtilisateurVerrouillage(null);
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
+
+        assertEquals("Vous n'êtes pas autorisé à libérer cette place", exception.getMessage());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void libererPlace_utilisateurIntrouvable_leveException() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
+        place.setUtilisateurVerrouillage(utilisateur);
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+        when(utilisateurRepository.findByEmail("inconnu@legrandcinema.com")).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class,
+                () -> placeService.libererPlace(1L, "inconnu@legrandcinema.com"));
+
+        verify(placeRepository, never()).save(any());
     }
 
     @Test
