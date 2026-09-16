@@ -34,8 +34,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/error").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/films/**", "/api/seances/**").permitAll()
-                        .requestMatchers("/api/films/**", "/api/seances/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/films/**", "/api/seances/**", "/api/salles/**").permitAll()
+                        .requestMatchers("/api/films/**", "/api/seances/**", "/api/salles/**").hasRole("ADMIN")
                         .requestMatchers("/api/places/*/bloquer", "/api/places/*/debloquer").hasRole("ADMIN")
                         .requestMatchers("/api/billets/scan").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
