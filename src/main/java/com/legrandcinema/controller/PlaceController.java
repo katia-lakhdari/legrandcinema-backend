@@ -38,8 +38,8 @@ public class PlaceController {
     }
 
     @PostMapping("/{id}/liberer")
-    public PlaceResponse libererPlace(@PathVariable Long id) {
-        Place place = placeService.libererPlace(id);
+    public PlaceResponse libererPlace(@PathVariable Long id, Authentication authentication) {
+        Place place = placeService.libererPlace(id, authentication.getName());
         return new PlaceResponse(place.getId(), place.getNumero(),
                 place.getStatut().name(), place.getFinVerrouillage(), place.getRaisonBlocage());
     }
