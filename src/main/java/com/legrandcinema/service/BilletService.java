@@ -28,4 +28,16 @@ public class BilletService {
 
         return billetRepository.save(billet);
     }
+
+    public Billet scannerBillet(String qrCode) {
+        Billet billet = billetRepository.findByQrCode(qrCode)
+                .orElseThrow(() -> new RuntimeException("Billet introuvable"));
+
+        if (billet.isScanne()) {
+            throw new RuntimeException("Ce billet a déjà été scanné");
+        }
+
+        billet.setScanne(true);
+        return billetRepository.save(billet);
+    }
 }
