@@ -50,8 +50,27 @@ public class PlaceService {
         return placeRepository.save(place);
     }
 
-    public Place libererPlace(Long id) {
+    public Place libererPlace(Long id, String emailUtilisateur) {
         Place place = trouverParId(id);
+
+        if (place.getStatut() == Place.StatutPlace.RESERVEE) {
+            throw new RuntimeException("Cette place est déjà réservée et payée, impossible de la libérer");
+        }
+
+        libererSiExpiree(place);
+
+        if (place.getStatut() != Place.StatutPlace.VERROUILLEE) {
+            throw new RuntimeException("Cette place n'est pas verrouillée");
+        }
+
+        Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        if (place.getUtilisateurVerrouillage() == null
+                || !place.getUtilisateurVerrouillage().getId().equals(utilisateur.getId())) {
+            throw new RuntimeException("Vous n'êtes pas autorisé à libérer cette place");
+        }
+
         place.setStatut(Place.StatutPlace.LIBRE);
         place.setFinVerrouillage(null);
         place.setUtilisateurVerrouillage(null);
