@@ -3,13 +3,16 @@ package com.legrandcinema.service;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Film;
 import com.legrandcinema.entity.Salle;
+import com.legrandcinema.entity.Place;
 import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SalleRepository;
+import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.dto.request.SeanceRequest;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -23,6 +26,9 @@ public class SeanceService {
 
     @Autowired
     private SalleRepository salleRepository;
+
+    @Autowired
+    private PlaceRepository placeRepository;
 
     public List<Seance> listerToutesLesSeances() {
         return seanceRepository.findAll();
@@ -44,7 +50,40 @@ public class SeanceService {
         seance.setSalle(salle);
         seance.setDateHeure(request.getDateHeure());
         seance.setPrix(request.getPrix());
-        return seanceRepository.save(seance);
+        Seance seanceSauvegardee = seanceRepository.save(seance);
+
+        int capacite = salle.getCapacite();
+        int siegesParRangee = 20;
+        int nombreRangeesCompletes = capacite / siegesParRangee;
+        int siegesRangeeIncomplete = capacite % siegesParRangee;
+
+        List<Place> places = new ArrayList<>();
+        char lettreRangee = 'A';
+
+        for (int rangee = 0; rangee < nombreRangeesCompletes; rangee++) {
+            for (int numeroSiege = 1; numeroSiege <= siegesParRangee; numeroSiege++) {
+                Place place = new Place();
+                place.setSeance(seanceSauvegardee);
+                place.setNumero(lettreRangee + String.valueOf(numeroSiege));
+                place.setStatut(Place.StatutPlace.LIBRE);
+                places.add(place);
+            }
+            lettreRangee++;
+        }
+
+        if (siegesRangeeIncomplete > 0) {
+            for (int numeroSiege = 1; numeroSiege <= siegesRangeeIncomplete; numeroSiege++) {
+                Place place = new Place();
+                place.setSeance(seanceSauvegardee);
+                place.setNumero(lettreRangee + String.valueOf(numeroSiege));
+                place.setStatut(Place.StatutPlace.LIBRE);
+                places.add(place);
+            }
+        }
+
+        placeRepository.saveAll(places);
+
+        return seanceSauvegardee;
     }
 
     public Seance modifierSeance(Long id, SeanceRequest request) {
