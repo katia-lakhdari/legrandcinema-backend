@@ -33,6 +33,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/error").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/films/**", "/api/seances/**").permitAll()
                         .requestMatchers("/api/films/**", "/api/seances/**").hasRole("ADMIN")
                         .requestMatchers("/api/places/*/bloquer", "/api/places/*/debloquer").hasRole("ADMIN")
