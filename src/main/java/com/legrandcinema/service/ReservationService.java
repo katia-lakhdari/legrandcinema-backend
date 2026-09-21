@@ -45,6 +45,10 @@ public class ReservationService {
             Place place = placeRepository.findById(placeId)
                     .orElseThrow(() -> new ResourceNotFoundException("Place introuvable"));
 
+            if (!place.getSeance().getId().equals(seance.getId())) {
+                throw new RuntimeException("Cette place n'appartient pas à la séance demandée");
+            }
+
             if (place.getStatut() != Place.StatutPlace.VERROUILLEE) {
                 throw new RuntimeException("Cette place n'est pas verrouillée");
             }
