@@ -1,15 +1,21 @@
 package com.legrandcinema.controller;
 
 import com.legrandcinema.dto.request.ScanBilletRequest;
+import com.legrandcinema.dto.response.BilletResponse;
 import com.legrandcinema.dto.response.ScanBilletResponse;
 import com.legrandcinema.entity.Billet;
+import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.service.BilletService;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/billets")
@@ -32,5 +38,28 @@ public class BilletController {
                 reservation.getSeance().getDateHeure().toString(),
                 reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom()
         );
+    }
+
+    @GetMapping("/mes-billets")
+    public List<BilletResponse> mesBillets(Authentication authentication) {
+        List<Billet> billets = billetService.mesBillets(authentication.getName());
+
+        return billets.stream()
+                .map(billet -> {
+                    Reservation reservation = billet.getReservation();
+                    List<String> numerosPlaces = reservation.getPlaces().stream()
+                            .map(Place::getNumero)
+                            .toList();
+
+                    return new BilletResponse(
+                            billet.getId(),
+                            billet.getQrCode(),
+                            billet.isScanne(),
+                            reservation.getSeance().getFilm().getTitre(),
+                            reservation.getSeance().getDateHeure().toString(),
+                            numerosPlaces
+                    );
+                })
+                .toList();
     }
 }

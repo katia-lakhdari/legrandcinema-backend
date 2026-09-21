@@ -2,18 +2,23 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Reservation;
+import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.repository.BilletRepository;
+import com.legrandcinema.repository.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
 public class BilletService {
 
     private final BilletRepository billetRepository;
+    private final UtilisateurRepository utilisateurRepository;
 
-    public BilletService(BilletRepository billetRepository) {
+    public BilletService(BilletRepository billetRepository, UtilisateurRepository utilisateurRepository) {
         this.billetRepository = billetRepository;
+        this.utilisateurRepository = utilisateurRepository;
     }
 
     public Billet creerBillet(Reservation reservation) {
@@ -39,5 +44,12 @@ public class BilletService {
 
         billet.setScanne(true);
         return billetRepository.save(billet);
+    }
+
+    public List<Billet> mesBillets(String emailUtilisateur) {
+        Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        return billetRepository.findByReservationUtilisateurId(utilisateur.getId());
     }
 }
