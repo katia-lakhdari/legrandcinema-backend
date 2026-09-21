@@ -61,6 +61,7 @@ class ReservationServiceTest {
         place = new Place();
         place.setId(100L);
         place.setNumero("A12");
+        place.setSeance(seance);
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(3));
         place.setUtilisateurVerrouillage(utilisateur);
@@ -116,6 +117,27 @@ class ReservationServiceTest {
         assertThrows(ResourceNotFoundException.class,
                 () -> reservationService.creerReservation(requete, EMAIL));
 
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void creerReservation_placePourAutreSeance_leveException() {
+        Seance autreSeance = new Seance();
+        autreSeance.setId(20L);
+        place.setSeance(autreSeance);
+
+        ReservationRequest requete = new ReservationRequest();
+        requete.setSeanceId(10L);
+        requete.setPlaceIds(List.of(100L));
+
+        when(utilisateurRepository.findByEmail(EMAIL)).thenReturn(Optional.of(utilisateur));
+        when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
+        when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> reservationService.creerReservation(requete, EMAIL));
+
+        assertEquals("Cette place n'appartient pas à la séance demandée", exception.getMessage());
         verify(reservationRepository, never()).save(any());
     }
 
@@ -185,6 +207,7 @@ class ReservationServiceTest {
         Place placeInvalide = new Place();
         placeInvalide.setId(101L);
         placeInvalide.setNumero("A13");
+        placeInvalide.setSeance(seance);
         placeInvalide.setStatut(StatutPlace.LIBRE);
 
         ReservationRequest requete = new ReservationRequest();
