@@ -21,13 +21,16 @@ public class PaiementService {
     private final ReservationRepository reservationRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final BilletService billetService;
+    private final EmailService emailService;
 
     public PaiementService(ReservationRepository reservationRepository,
                            UtilisateurRepository utilisateurRepository,
-                           BilletService billetService) {
+                           BilletService billetService,
+                           EmailService emailService) {
         this.reservationRepository = reservationRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.billetService = billetService;
+        this.emailService = emailService;
     }
 
     public PaiementResponse traiterPaiement(PaiementRequest requete, String emailUtilisateur) {
@@ -76,6 +79,16 @@ public class PaiementService {
         reservationRepository.save(reservation);
 
         Billet billet = billetService.creerBillet(reservation);
+
+        try {
+            String sujet = "Confirmation de votre réservation - Le Grand Cinéma";
+            String contenu = "Bonjour,\n\nVotre paiement a bien été reçu et votre billet est confirmé.\n\nVotre code QR : "
+                    + billet.getQrCode()
+                    + "\n\nÀ bientôt au cinéma !";
+            emailService.envoyerEmail(utilisateur.getEmail(), sujet, contenu);
+        } catch (RuntimeException exception) {
+            System.out.println("Échec de l'envoi de l'email de confirmation : " + exception.getMessage());
+        }
 
         return new PaiementResponse(
                 reservation.getId(),
