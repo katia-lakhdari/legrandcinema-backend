@@ -10,6 +10,7 @@ import com.legrandcinema.repository.ReservationRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
+import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
 import org.springframework.stereotype.Service;
 
@@ -66,7 +67,11 @@ public class PaiementService {
                     .setConfirm(true)
                     .build();
 
-            paymentIntent = PaymentIntent.create(parametres);
+            RequestOptions options = RequestOptions.builder()
+                    .setIdempotencyKey("paiement-reservation-" + reservation.getId())
+                    .build();
+
+            paymentIntent = PaymentIntent.create(parametres, options);
         } catch (StripeException e) {
             throw new RuntimeException("Le paiement a échoué : " + e.getMessage());
         }
