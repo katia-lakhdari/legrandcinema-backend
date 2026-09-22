@@ -12,6 +12,7 @@ import com.legrandcinema.repository.ReservationRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
+import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,9 @@ class PaiementServiceTest {
 
     @Mock
     private BilletService billetService;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private PaiementService paiementService;
@@ -83,7 +87,7 @@ class PaiementServiceTest {
         when(billetService.creerBillet(reservation)).thenReturn(billetMock);
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
-            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
                     .thenReturn(paymentIntentMock);
 
             PaiementResponse resultat = paiementService.traiterPaiement(requete, "katia@legrandcinema.com");
@@ -95,6 +99,61 @@ class PaiementServiceTest {
 
         assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
         verify(reservationRepository, times(1)).save(reservation);
+        verify(billetService, times(1)).creerBillet(reservation);
+        verify(emailService, times(1)).envoyerEmail(eq("katia@legrandcinema.com"), anyString(), anyString());
+    }
+
+    @Test
+    void traiterPaiement_envoieCleAntiDoublePaiementBaseeSurLaReservation() {
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+
+        Billet billetMock = new Billet();
+        billetMock.setQrCode("qr-code-test-123");
+        when(billetService.creerBillet(reservation)).thenReturn(billetMock);
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
+                    .thenReturn(paymentIntentMock);
+
+            paiementService.traiterPaiement(requete, "katia@legrandcinema.com");
+
+            stripeMocke.verify(() -> PaymentIntent.create(
+                    any(PaymentIntentCreateParams.class),
+                    argThat((RequestOptions options) -> "paiement-reservation-1".equals(options.getIdempotencyKey()))
+            ));
+        }
+    }
+
+    @Test
+    void traiterPaiement_echecEnvoiEmail_nEmpechePasLePaiement() {
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+
+        Billet billetMock = new Billet();
+        billetMock.setQrCode("qr-code-test-123");
+        when(billetService.creerBillet(reservation)).thenReturn(billetMock);
+
+        doThrow(new RuntimeException("SendGrid indisponible"))
+                .when(emailService).envoyerEmail(anyString(), anyString(), anyString());
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
+                    .thenReturn(paymentIntentMock);
+
+            PaiementResponse resultat = paiementService.traiterPaiement(requete, "katia@legrandcinema.com");
+
+            assertEquals("PAYEE", resultat.getStatutPaiement());
+            assertEquals("qr-code-test-123", resultat.getQrCode());
+        }
+
+        assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
         verify(billetService, times(1)).creerBillet(reservation);
     }
 
@@ -168,7 +227,7 @@ class PaiementServiceTest {
         when(stripeException.getMessage()).thenReturn("Carte refusée");
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
-            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
                     .thenThrow(stripeException);
 
             RuntimeException exception = assertThrows(RuntimeException.class,
@@ -178,6 +237,7 @@ class PaiementServiceTest {
         }
 
         verify(billetService, never()).creerBillet(any());
+        verify(emailService, never()).envoyerEmail(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -189,7 +249,7 @@ class PaiementServiceTest {
         when(paymentIntentMock.getStatus()).thenReturn("requires_action");
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
-            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
                     .thenReturn(paymentIntentMock);
 
             assertThrows(RuntimeException.class,
@@ -197,5 +257,6 @@ class PaiementServiceTest {
         }
 
         verify(billetService, never()).creerBillet(any());
+        verify(emailService, never()).envoyerEmail(anyString(), anyString(), anyString());
     }
 }
