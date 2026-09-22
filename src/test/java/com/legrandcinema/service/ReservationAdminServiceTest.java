@@ -21,6 +21,10 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,7 +51,7 @@ class ReservationAdminServiceTest {
         seance = new Seance();
         seance.setId(1L);
         seance.setFilm(film);
-        seance.setDateHeure(LocalDateTime.of(2026, 9, 15, 20, 0));
+        seance.setDateHeure(LocalDateTime.now().plusDays(7));
     }
 
     @Test
@@ -59,7 +63,10 @@ class ReservationAdminServiceTest {
         reservation.setPlaces(Arrays.asList(new Place(), new Place()));
         reservation.setStatut(Reservation.StatutReservation.PAYEE);
 
-        when(reservationRepository.findAll()).thenReturn(List.of(reservation));
+        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
+                any(LocalDateTime.class),
+                eq(Reservation.StatutReservation.ANNULEE)
+        )).thenReturn(List.of(reservation));
 
         List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
 
@@ -92,7 +99,10 @@ class ReservationAdminServiceTest {
         reservation2.setPlaces(Collections.emptyList());
         reservation2.setStatut(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT);
 
-        when(reservationRepository.findAll()).thenReturn(Arrays.asList(reservation1, reservation2));
+        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
+                any(LocalDateTime.class),
+                eq(Reservation.StatutReservation.ANNULEE)
+        )).thenReturn(Arrays.asList(reservation1, reservation2));
 
         List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
 
@@ -103,10 +113,29 @@ class ReservationAdminServiceTest {
 
     @Test
     void listerReservations_aucuneReservation_renvoieListeVide() {
-        when(reservationRepository.findAll()).thenReturn(Collections.emptyList());
+        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
+                any(LocalDateTime.class),
+                eq(Reservation.StatutReservation.ANNULEE)
+        )).thenReturn(Collections.emptyList());
 
         List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
 
         assertTrue(resultats.isEmpty());
+    }
+
+    @Test
+    void listerReservations_utiliseLeFiltreEnCours_etJamaisFindAll() {
+        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
+                any(LocalDateTime.class),
+                eq(Reservation.StatutReservation.ANNULEE)
+        )).thenReturn(Collections.emptyList());
+
+        reservationAdminService.listerReservations();
+
+        verify(reservationRepository).findBySeance_DateHeureAfterAndStatutNot(
+                any(LocalDateTime.class),
+                eq(Reservation.StatutReservation.ANNULEE)
+        );
+        verify(reservationRepository, never()).findAll();
     }
 }
