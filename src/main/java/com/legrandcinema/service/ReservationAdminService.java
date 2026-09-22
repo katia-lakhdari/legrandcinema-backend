@@ -6,6 +6,7 @@ import com.legrandcinema.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,7 +17,10 @@ public class ReservationAdminService {
     private final ReservationRepository reservationRepository;
 
     public List<ReservationAdminResponse> listerReservations() {
-        List<Reservation> reservations = reservationRepository.findAll();
+        List<Reservation> reservations = reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
+                LocalDateTime.now(),
+                Reservation.StatutReservation.ANNULEE
+        );
         List<ReservationAdminResponse> resultats = new ArrayList<>();
 
         for (Reservation reservation : reservations) {
