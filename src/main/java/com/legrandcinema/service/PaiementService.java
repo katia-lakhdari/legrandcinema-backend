@@ -23,15 +23,18 @@ public class PaiementService {
     private final UtilisateurRepository utilisateurRepository;
     private final BilletService billetService;
     private final EmailService emailService;
+    private final QrCodeService qrCodeService;
 
     public PaiementService(ReservationRepository reservationRepository,
                            UtilisateurRepository utilisateurRepository,
                            BilletService billetService,
-                           EmailService emailService) {
+                           EmailService emailService,
+                           QrCodeService qrCodeService) {
         this.reservationRepository = reservationRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.billetService = billetService;
         this.emailService = emailService;
+        this.qrCodeService = qrCodeService;
     }
 
     public PaiementResponse traiterPaiement(PaiementRequest requete, String emailUtilisateur) {
@@ -86,11 +89,13 @@ public class PaiementService {
         Billet billet = billetService.creerBillet(reservation);
 
         try {
+            byte[] imageQrCode = qrCodeService.genererQrCode(billet.getQrCode());
             String sujet = "Confirmation de votre réservation - Le Grand Cinéma";
-            String contenu = "Bonjour,\n\nVotre paiement a bien été reçu et votre billet est confirmé.\n\nVotre code QR : "
-                    + billet.getQrCode()
+            String contenu = "Bonjour,\n\nVotre paiement a bien été reçu et votre billet est confirmé.\n\n"
+                    + "Vous trouverez votre QR code en pièce jointe : présentez-le à l'entrée de la salle.\n\n"
+                    + "Référence de votre billet : " + billet.getQrCode()
                     + "\n\nÀ bientôt au cinéma !";
-            emailService.envoyerEmail(utilisateur.getEmail(), sujet, contenu);
+            emailService.envoyerEmailAvecImage(utilisateur.getEmail(), sujet, contenu, imageQrCode, "billet-qrcode.png");
         } catch (RuntimeException exception) {
             System.out.println("Échec de l'envoi de l'email de confirmation : " + exception.getMessage());
         }

@@ -2,7 +2,10 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Reservation;
+import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.BilletRepository;
+import com.legrandcinema.repository.UtilisateurRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +24,12 @@ class BilletServiceTest {
     @Mock
     private BilletRepository billetRepository;
 
+    @Mock
+    private UtilisateurRepository utilisateurRepository;
+
+    @Mock
+    private QrCodeService qrCodeService;
+
     @InjectMocks
     private BilletService billetService;
 
@@ -29,8 +38,12 @@ class BilletServiceTest {
 
     @BeforeEach
     void setUp() {
+        Utilisateur proprietaire = new Utilisateur();
+        proprietaire.setEmail("client@test.com");
+
         reservation = new Reservation();
         reservation.setId(1L);
+        reservation.setUtilisateur(proprietaire);
 
         billet = new Billet();
         billet.setId(1L);
@@ -96,5 +109,39 @@ class BilletServiceTest {
 
         assertEquals("Ce billet a déjà été scanné", exception.getMessage());
         verify(billetRepository, never()).save(any(Billet.class));
+    }
+
+    @Test
+    void obtenirImageQrCode_proprietaire_renvoieLImage() {
+        byte[] fausseImage = {1, 2, 3};
+        when(billetRepository.findById(1L)).thenReturn(Optional.of(billet));
+        when(qrCodeService.genererQrCode("qr-code-test-123")).thenReturn(fausseImage);
+
+        byte[] resultat = billetService.obtenirImageQrCode(1L, "client@test.com");
+
+        assertArrayEquals(fausseImage, resultat);
+        verify(qrCodeService, times(1)).genererQrCode("qr-code-test-123");
+    }
+
+    @Test
+    void obtenirImageQrCode_billetInexistant_leveResourceNotFound() {
+        when(billetRepository.findById(99L)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
+                () -> billetService.obtenirImageQrCode(99L, "client@test.com"));
+
+        assertEquals("Billet introuvable", exception.getMessage());
+        verify(qrCodeService, never()).genererQrCode(anyString());
+    }
+
+    @Test
+    void obtenirImageQrCode_autreUtilisateur_leveResourceNotFound() {
+        when(billetRepository.findById(1L)).thenReturn(Optional.of(billet));
+
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
+                () -> billetService.obtenirImageQrCode(1L, "curieux@test.com"));
+
+        assertEquals("Billet introuvable", exception.getMessage());
+        verify(qrCodeService, never()).genererQrCode(anyString());
     }
 }
