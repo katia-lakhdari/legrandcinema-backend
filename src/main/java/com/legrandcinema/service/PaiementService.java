@@ -1,6 +1,8 @@
 package com.legrandcinema.service;
 
+import com.legrandcinema.dto.request.ConfirmationPaiementRequest;
 import com.legrandcinema.dto.request.PaiementRequest;
+import com.legrandcinema.dto.response.IntentionPaiementResponse;
 import com.legrandcinema.dto.response.PaiementResponse;
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Reservation;
@@ -37,8 +39,90 @@ public class PaiementService {
         this.qrCodeService = qrCodeService;
     }
 
-    public PaiementResponse traiterPaiement(PaiementRequest requete, String emailUtilisateur) {
-        Reservation reservation = reservationRepository.findById(requete.getReservationId())
+    public IntentionPaiementResponse creerIntentionPaiement(PaiementRequest requete, String emailUtilisateur) {
+        Reservation reservation = verifierReservationAvantPaiement(requete.getReservationId(), emailUtilisateur);
+
+        BigDecimal montantEnEuros = calculerMontantEnEuros(reservation);
+        long montantEnCentimes = montantEnEuros.multiply(BigDecimal.valueOf(100)).longValueExact();
+
+        PaymentIntent paymentIntent;
+        try {
+            PaymentIntentCreateParams parametres = PaymentIntentCreateParams.builder()
+                    .setAmount(montantEnCentimes)
+                    .setCurrency("eur")
+                    .addPaymentMethodType("card")
+                    .putMetadata("reservationId", reservation.getId().toString())
+                    .build();
+
+            RequestOptions options = RequestOptions.builder()
+                    .setIdempotencyKey("intention-reservation-" + reservation.getId())
+                    .build();
+
+            paymentIntent = PaymentIntent.create(parametres, options);
+        } catch (StripeException e) {
+            throw new RuntimeException("La préparation du paiement a échoué : " + e.getMessage());
+        }
+
+        return new IntentionPaiementResponse(
+                reservation.getId(),
+                paymentIntent.getId(),
+                paymentIntent.getClientSecret(),
+                montantEnEuros
+        );
+    }
+
+    public PaiementResponse confirmerPaiement(ConfirmationPaiementRequest requete, String emailUtilisateur) {
+        Reservation reservation = verifierReservationAvantPaiement(requete.getReservationId(), emailUtilisateur);
+
+        BigDecimal montantEnEuros = calculerMontantEnEuros(reservation);
+        long montantEnCentimes = montantEnEuros.multiply(BigDecimal.valueOf(100)).longValueExact();
+
+        PaymentIntent paymentIntent;
+        try {
+            paymentIntent = PaymentIntent.retrieve(requete.getPaymentIntentId());
+        } catch (StripeException e) {
+            throw new RuntimeException("Impossible de vérifier le paiement auprès de Stripe : " + e.getMessage());
+        }
+
+        if (!"succeeded".equals(paymentIntent.getStatus())) {
+            throw new RuntimeException("Le paiement n'a pas été confirmé par Stripe");
+        }
+
+        if (!Long.valueOf(montantEnCentimes).equals(paymentIntent.getAmount())) {
+            throw new RuntimeException("Le montant payé ne correspond pas au prix de la réservation");
+        }
+
+        if (!reservation.getId().toString().equals(paymentIntent.getMetadata().get("reservationId"))) {
+            throw new RuntimeException("Ce paiement ne correspond pas à cette réservation");
+        }
+
+        reservation.setStatut(Reservation.StatutReservation.PAYEE);
+        reservationRepository.save(reservation);
+
+        Billet billet = billetService.creerBillet(reservation);
+
+        try {
+            byte[] imageQrCode = qrCodeService.genererQrCode(billet.getQrCode());
+            String sujet = "Confirmation de votre réservation - Le Grand Cinéma";
+            String contenu = "Bonjour,\n\nVotre paiement a bien été reçu et votre billet est confirmé.\n\n"
+                    + "Vous trouverez votre QR code en pièce jointe : présentez-le à l'entrée de la salle.\n\n"
+                    + "Référence de votre billet : " + billet.getQrCode()
+                    + "\n\nÀ bientôt au cinéma !";
+            emailService.envoyerEmailAvecImage(reservation.getUtilisateur().getEmail(), sujet, contenu, imageQrCode, "billet-qrcode.png");
+        } catch (RuntimeException exception) {
+            System.out.println("Échec de l'envoi de l'email de confirmation : " + exception.getMessage());
+        }
+
+        return new PaiementResponse(
+                reservation.getId(),
+                "PAYEE",
+                montantEnEuros,
+                billet.getQrCode()
+        );
+    }
+
+    private Reservation verifierReservationAvantPaiement(Long reservationId, String emailUtilisateur) {
+        Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Réservation introuvable"));
 
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
@@ -56,55 +140,11 @@ public class PaiementService {
             throw new RuntimeException("Cette réservation est annulée");
         }
 
-        BigDecimal montantEnEuros = reservation.getSeance().getPrix()
+        return reservation;
+    }
+
+    private BigDecimal calculerMontantEnEuros(Reservation reservation) {
+        return reservation.getSeance().getPrix()
                 .multiply(BigDecimal.valueOf(reservation.getPlaces().size()));
-        long montantEnCentimes = montantEnEuros.multiply(BigDecimal.valueOf(100)).longValueExact();
-
-        PaymentIntent paymentIntent;
-        try {
-            PaymentIntentCreateParams parametres = PaymentIntentCreateParams.builder()
-                    .setAmount(montantEnCentimes)
-                    .setCurrency("eur")
-                    .setPaymentMethod("pm_card_visa")
-                    .addPaymentMethodType("card")
-                    .setConfirm(true)
-                    .build();
-
-            RequestOptions options = RequestOptions.builder()
-                    .setIdempotencyKey("paiement-reservation-" + reservation.getId())
-                    .build();
-
-            paymentIntent = PaymentIntent.create(parametres, options);
-        } catch (StripeException e) {
-            throw new RuntimeException("Le paiement a échoué : " + e.getMessage());
-        }
-
-        if (!"succeeded".equals(paymentIntent.getStatus())) {
-            throw new RuntimeException("Le paiement n'a pas été confirmé par Stripe");
-        }
-
-        reservation.setStatut(Reservation.StatutReservation.PAYEE);
-        reservationRepository.save(reservation);
-
-        Billet billet = billetService.creerBillet(reservation);
-
-        try {
-            byte[] imageQrCode = qrCodeService.genererQrCode(billet.getQrCode());
-            String sujet = "Confirmation de votre réservation - Le Grand Cinéma";
-            String contenu = "Bonjour,\n\nVotre paiement a bien été reçu et votre billet est confirmé.\n\n"
-                    + "Vous trouverez votre QR code en pièce jointe : présentez-le à l'entrée de la salle.\n\n"
-                    + "Référence de votre billet : " + billet.getQrCode()
-                    + "\n\nÀ bientôt au cinéma !";
-            emailService.envoyerEmailAvecImage(utilisateur.getEmail(), sujet, contenu, imageQrCode, "billet-qrcode.png");
-        } catch (RuntimeException exception) {
-            System.out.println("Échec de l'envoi de l'email de confirmation : " + exception.getMessage());
-        }
-
-        return new PaiementResponse(
-                reservation.getId(),
-                "PAYEE",
-                montantEnEuros,
-                billet.getQrCode()
-        );
     }
 }

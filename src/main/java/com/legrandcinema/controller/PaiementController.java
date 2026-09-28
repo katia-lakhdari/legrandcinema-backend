@@ -1,6 +1,8 @@
 package com.legrandcinema.controller;
 
+import com.legrandcinema.dto.request.ConfirmationPaiementRequest;
 import com.legrandcinema.dto.request.PaiementRequest;
+import com.legrandcinema.dto.response.IntentionPaiementResponse;
 import com.legrandcinema.dto.response.PaiementResponse;
 import com.legrandcinema.service.PaiementService;
 import jakarta.validation.Valid;
@@ -17,9 +19,15 @@ public class PaiementController {
         this.paiementService = paiementService;
     }
 
-    @PostMapping
-    public PaiementResponse traiterPaiement(@Valid @RequestBody PaiementRequest requete,
-                                            Authentication authentication) {
-        return paiementService.traiterPaiement(requete, authentication.getName());
+    @PostMapping("/intention")
+    public IntentionPaiementResponse creerIntentionPaiement(@Valid @RequestBody PaiementRequest requete,
+                                                            Authentication authentication) {
+        return paiementService.creerIntentionPaiement(requete, authentication.getName());
+    }
+
+    @PostMapping("/confirmation")
+    public PaiementResponse confirmerPaiement(@Valid @RequestBody ConfirmationPaiementRequest requete,
+                                              Authentication authentication) {
+        return paiementService.confirmerPaiement(requete, authentication.getName());
     }
 }
