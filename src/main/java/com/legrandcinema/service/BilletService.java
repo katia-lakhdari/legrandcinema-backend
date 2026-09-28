@@ -3,6 +3,7 @@ package com.legrandcinema.service;
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.BilletRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import org.springframework.stereotype.Service;
@@ -15,10 +16,12 @@ public class BilletService {
 
     private final BilletRepository billetRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final QrCodeService qrCodeService;
 
-    public BilletService(BilletRepository billetRepository, UtilisateurRepository utilisateurRepository) {
+    public BilletService(BilletRepository billetRepository, UtilisateurRepository utilisateurRepository, QrCodeService qrCodeService) {
         this.billetRepository = billetRepository;
         this.utilisateurRepository = utilisateurRepository;
+        this.qrCodeService = qrCodeService;
     }
 
     public Billet creerBillet(Reservation reservation) {
@@ -51,5 +54,18 @@ public class BilletService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
         return billetRepository.findByReservationUtilisateurId(utilisateur.getId());
+    }
+
+    public byte[] obtenirImageQrCode(Long idBillet, String emailUtilisateur) {
+        Billet billet = billetRepository.findById(idBillet)
+                .orElseThrow(() -> new ResourceNotFoundException("Billet introuvable"));
+
+        String emailProprietaire = billet.getReservation().getUtilisateur().getEmail();
+
+        if (!emailProprietaire.equals(emailUtilisateur)) {
+            throw new ResourceNotFoundException("Billet introuvable");
+        }
+
+        return qrCodeService.genererQrCode(billet.getQrCode());
     }
 }
