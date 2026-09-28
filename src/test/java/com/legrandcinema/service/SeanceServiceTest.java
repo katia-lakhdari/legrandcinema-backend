@@ -6,6 +6,7 @@ import com.legrandcinema.entity.Salle;
 import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SalleRepository;
+import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.dto.request.SeanceRequest;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,9 @@ class SeanceServiceTest {
     @Mock
     private SalleRepository salleRepository;
 
+    @Mock
+    private PlaceRepository placeRepository;
+
     @InjectMocks
     private SeanceService seanceService;
 
@@ -51,6 +55,7 @@ class SeanceServiceTest {
 
         salle = new Salle();
         salle.setId(1L);
+        salle.setCapacite(70);
 
         seance = new Seance();
         seance.setId(1L);
@@ -102,6 +107,7 @@ class SeanceServiceTest {
 
         assertEquals(new BigDecimal("9.50"), resultat.getPrix());
         verify(seanceRepository, times(1)).save(any(Seance.class));
+        verify(placeRepository, times(1)).saveAll(anyList());
     }
 
     @Test
