@@ -45,6 +45,9 @@ class PaiementServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private QrCodeService qrCodeService;
+
     @InjectMocks
     private PaiementService paiementService;
 
@@ -86,6 +89,9 @@ class PaiementServiceTest {
         billetMock.setQrCode("qr-code-test-123");
         when(billetService.creerBillet(reservation)).thenReturn(billetMock);
 
+        byte[] fausseImage = {1, 2, 3};
+        when(qrCodeService.genererQrCode("qr-code-test-123")).thenReturn(fausseImage);
+
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
                     .thenReturn(paymentIntentMock);
@@ -100,7 +106,8 @@ class PaiementServiceTest {
         assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
         verify(reservationRepository, times(1)).save(reservation);
         verify(billetService, times(1)).creerBillet(reservation);
-        verify(emailService, times(1)).envoyerEmail(eq("katia@legrandcinema.com"), anyString(), anyString());
+        verify(emailService, times(1)).envoyerEmailAvecImage(
+                eq("katia@legrandcinema.com"), anyString(), anyString(), eq(fausseImage), eq("billet-qrcode.png"));
     }
 
     @Test
@@ -141,7 +148,7 @@ class PaiementServiceTest {
         when(billetService.creerBillet(reservation)).thenReturn(billetMock);
 
         doThrow(new RuntimeException("SendGrid indisponible"))
-                .when(emailService).envoyerEmail(anyString(), anyString(), anyString());
+                .when(emailService).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
@@ -155,6 +162,35 @@ class PaiementServiceTest {
 
         assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
         verify(billetService, times(1)).creerBillet(reservation);
+    }
+
+    @Test
+    void traiterPaiement_echecGenerationQrCode_nEmpechePasLePaiement() {
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+
+        Billet billetMock = new Billet();
+        billetMock.setQrCode("qr-code-test-123");
+        when(billetService.creerBillet(reservation)).thenReturn(billetMock);
+
+        when(qrCodeService.genererQrCode("qr-code-test-123"))
+                .thenThrow(new RuntimeException("Erreur lors de la génération du QR code"));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
+                    .thenReturn(paymentIntentMock);
+
+            PaiementResponse resultat = paiementService.traiterPaiement(requete, "katia@legrandcinema.com");
+
+            assertEquals("PAYEE", resultat.getStatutPaiement());
+            assertEquals("qr-code-test-123", resultat.getQrCode());
+        }
+
+        assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
+        verify(emailService, never()).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -237,7 +273,8 @@ class PaiementServiceTest {
         }
 
         verify(billetService, never()).creerBillet(any());
-        verify(emailService, never()).envoyerEmail(anyString(), anyString(), anyString());
+        verify(qrCodeService, never()).genererQrCode(anyString());
+        verify(emailService, never()).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -257,6 +294,7 @@ class PaiementServiceTest {
         }
 
         verify(billetService, never()).creerBillet(any());
-        verify(emailService, never()).envoyerEmail(anyString(), anyString(), anyString());
+        verify(qrCodeService, never()).genererQrCode(anyString());
+        verify(emailService, never()).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
     }
 }
