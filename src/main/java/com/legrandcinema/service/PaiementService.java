@@ -14,12 +14,16 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 
 @Service
 public class PaiementService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PaiementService.class);
 
     private final ReservationRepository reservationRepository;
     private final UtilisateurRepository utilisateurRepository;
@@ -110,7 +114,7 @@ public class PaiementService {
                     + "\n\nÀ bientôt au cinéma !";
             emailService.envoyerEmailAvecImage(reservation.getUtilisateur().getEmail(), sujet, contenu, imageQrCode, "billet-qrcode.png");
         } catch (RuntimeException exception) {
-            System.out.println("Échec de l'envoi de l'email de confirmation : " + exception.getMessage());
+            LOGGER.warn("Échec de l'envoi de l'email de confirmation pour la réservation {}", reservation.getId(), exception);
         }
 
         return new PaiementResponse(
@@ -129,7 +133,7 @@ public class PaiementService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
         if (!reservation.getUtilisateur().getId().equals(utilisateur.getId())) {
-            throw new RuntimeException("Cette réservation ne vous appartient pas");
+            throw new ResourceNotFoundException("Réservation introuvable");
         }
 
         if (reservation.getStatut() == Reservation.StatutReservation.PAYEE) {
