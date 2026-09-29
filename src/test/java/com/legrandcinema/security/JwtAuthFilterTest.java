@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -33,6 +34,8 @@ class JwtAuthFilterTest {
     @BeforeEach
     void initialisation() {
         jwtUtil = new JwtUtil();
+        ReflectionTestUtils.setField(jwtUtil, "cleSecrete", "cle-de-test-uniquement-pour-les-tests-unitaires-0123456789");
+        jwtUtil.init();
         jwtAuthFilter = new JwtAuthFilter(jwtUtil);
     }
 
