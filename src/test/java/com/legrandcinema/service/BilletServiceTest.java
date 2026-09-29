@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -109,6 +110,47 @@ class BilletServiceTest {
 
         assertEquals("Ce billet a déjà été scanné", exception.getMessage());
         verify(billetRepository, never()).save(any(Billet.class));
+    }
+
+    @Test
+    void mesBillets_utilisateurConnu_renvoieSesBillets() {
+        Utilisateur client = new Utilisateur();
+        client.setId(5L);
+        client.setEmail("client@test.com");
+
+        when(utilisateurRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
+        when(billetRepository.findByReservationUtilisateurId(5L)).thenReturn(List.of(billet));
+
+        List<Billet> resultat = billetService.mesBillets("client@test.com");
+
+        assertEquals(1, resultat.size());
+        assertEquals(billet, resultat.get(0));
+        verify(billetRepository, times(1)).findByReservationUtilisateurId(5L);
+    }
+
+    @Test
+    void mesBillets_aucunBillet_renvoieListeVide() {
+        Utilisateur client = new Utilisateur();
+        client.setId(5L);
+        client.setEmail("client@test.com");
+
+        when(utilisateurRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
+        when(billetRepository.findByReservationUtilisateurId(5L)).thenReturn(List.of());
+
+        List<Billet> resultat = billetService.mesBillets("client@test.com");
+
+        assertTrue(resultat.isEmpty());
+    }
+
+    @Test
+    void mesBillets_utilisateurInconnu_leveException() {
+        when(utilisateurRepository.findByEmail("inconnu@test.com")).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> billetService.mesBillets("inconnu@test.com"));
+
+        assertEquals("Utilisateur introuvable", exception.getMessage());
+        verify(billetRepository, never()).findByReservationUtilisateurId(anyLong());
     }
 
     @Test
