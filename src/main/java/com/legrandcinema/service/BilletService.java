@@ -39,7 +39,7 @@ public class BilletService {
 
     public Billet scannerBillet(String qrCode) {
         Billet billet = billetRepository.findByQrCode(qrCode)
-                .orElseThrow(() -> new RuntimeException("Billet introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Billet introuvable"));
 
         if (billet.isScanne()) {
             throw new RuntimeException("Ce billet a déjà été scanné");

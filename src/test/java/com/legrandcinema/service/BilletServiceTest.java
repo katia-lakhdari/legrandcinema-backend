@@ -89,10 +89,10 @@ class BilletServiceTest {
     }
 
     @Test
-    void scannerBillet_qrCodeInconnu_leveException() {
+    void scannerBillet_qrCodeInconnu_leveResourceNotFound() {
         when(billetRepository.findByQrCode("qr-code-invalide")).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
                 () -> billetService.scannerBillet("qr-code-invalide"));
 
         assertEquals("Billet introuvable", exception.getMessage());
