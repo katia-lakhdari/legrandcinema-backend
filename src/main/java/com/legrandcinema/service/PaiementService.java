@@ -133,7 +133,7 @@ public class PaiementService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
         if (!reservation.getUtilisateur().getId().equals(utilisateur.getId())) {
-            throw new RuntimeException("Cette réservation ne vous appartient pas");
+            throw new ResourceNotFoundException("Réservation introuvable");
         }
 
         if (reservation.getStatut() == Reservation.StatutReservation.PAYEE) {

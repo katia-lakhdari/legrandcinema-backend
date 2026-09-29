@@ -175,7 +175,7 @@ class PaiementServiceTest {
     }
 
     @Test
-    void creerIntentionPaiement_reservationNAppartientPasAUtilisateur_leveException() {
+    void creerIntentionPaiement_reservationNAppartientPasAUtilisateur_leveResourceNotFound() {
         Utilisateur autreUtilisateur = new Utilisateur();
         autreUtilisateur.setId(2L);
         autreUtilisateur.setEmail("autre@mail.com");
@@ -183,10 +183,10 @@ class PaiementServiceTest {
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("autre@mail.com")).thenReturn(Optional.of(autreUtilisateur));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
                 () -> paiementService.creerIntentionPaiement(requeteIntention, "autre@mail.com"));
 
-        assertEquals("Cette réservation ne vous appartient pas", exception.getMessage());
+        assertEquals("Réservation introuvable", exception.getMessage());
     }
 
     @Test
