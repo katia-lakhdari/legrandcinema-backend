@@ -367,7 +367,7 @@ class PaiementServiceTest {
         billetMock.setQrCode("qr-code-test-123");
         when(billetService.creerBillet(reservation)).thenReturn(billetMock);
 
-        doThrow(new RuntimeException("SendGrid indisponible"))
+        doThrow(new RuntimeException("Email indisponible"))
                 .when(emailService).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
