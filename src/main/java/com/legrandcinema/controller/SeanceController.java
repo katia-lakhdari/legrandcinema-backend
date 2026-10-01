@@ -20,30 +20,26 @@ public class SeanceController {
     public List<SeanceResponse> listerSeances() {
         List<Seance> seances = seanceService.listerToutesLesSeances();
         return seances.stream()
-                .map(seance -> new SeanceResponse(seance.getId(), seance.getFilm().getTitre(),
-                        seance.getSalle().getNom(), seance.getDateHeure(), seance.getPrix()))
+                .map(seance -> new SeanceResponse(seance, seanceService.compterPlacesLibres(seance.getId())))
                 .toList();
     }
 
     @GetMapping("/{id}")
     public SeanceResponse trouverSeance(@PathVariable Long id) {
         Seance seance = seanceService.trouverParId(id);
-        return new SeanceResponse(seance.getId(), seance.getFilm().getTitre(),
-                seance.getSalle().getNom(), seance.getDateHeure(), seance.getPrix());
+        return new SeanceResponse(seance, seanceService.compterPlacesLibres(seance.getId()));
     }
 
     @PostMapping
     public SeanceResponse creerSeance(@Valid @RequestBody SeanceRequest request) {
         Seance seance = seanceService.creerSeance(request);
-        return new SeanceResponse(seance.getId(), seance.getFilm().getTitre(),
-                seance.getSalle().getNom(), seance.getDateHeure(), seance.getPrix());
+        return new SeanceResponse(seance, seanceService.compterPlacesLibres(seance.getId()));
     }
 
     @PutMapping("/{id}")
     public SeanceResponse modifierSeance(@PathVariable Long id, @Valid @RequestBody SeanceRequest request) {
         Seance seance = seanceService.modifierSeance(id, request);
-        return new SeanceResponse(seance.getId(), seance.getFilm().getTitre(),
-                seance.getSalle().getNom(), seance.getDateHeure(), seance.getPrix());
+        return new SeanceResponse(seance, seanceService.compterPlacesLibres(seance.getId()));
     }
 
     @DeleteMapping("/{id}")

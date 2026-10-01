@@ -12,6 +12,7 @@ import com.legrandcinema.dto.request.SeanceRequest;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,6 +38,17 @@ public class SeanceService {
     public Seance trouverParId(Long id) {
         return seanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Séance introuvable"));
+    }
+
+    public List<Seance> listerSeancesAVenirDuFilm(Long filmId) {
+        if (!filmRepository.existsById(filmId)) {
+            throw new ResourceNotFoundException("Film introuvable");
+        }
+        return seanceRepository.trouverSeancesAVenirDuFilm(filmId, LocalDateTime.now());
+    }
+
+    public long compterPlacesLibres(Long seanceId) {
+        return placeRepository.countBySeanceIdAndStatut(seanceId, Place.StatutPlace.LIBRE);
     }
 
     public Seance creerSeance(SeanceRequest request) {
