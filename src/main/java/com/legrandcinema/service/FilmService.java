@@ -2,8 +2,10 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Film;
 import com.legrandcinema.repository.FilmRepository;
+import com.legrandcinema.repository.SeanceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 import java.util.List;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.dto.request.FilmRequest;
@@ -14,8 +16,15 @@ public class FilmService {
     @Autowired
     private FilmRepository filmRepository;
 
+    @Autowired
+    private SeanceRepository seanceRepository;
+
     public List<Film> listerTousLesFilms() {
         return filmRepository.findAll();
+    }
+
+    public List<Film> listerFilmsAlAffiche() {
+        return seanceRepository.trouverFilmsAvecSeanceAVenir(LocalDateTime.now());
     }
 
     public Film trouverParId(Long id) {
