@@ -3,6 +3,7 @@ package com.legrandcinema.service;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Film;
 import com.legrandcinema.entity.Salle;
+import com.legrandcinema.entity.Place;
 import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SalleRepository;
@@ -23,6 +24,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -95,6 +97,44 @@ class SeanceServiceTest {
         when(seanceRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> seanceService.trouverParId(99L));
+    }
+
+    @Test
+    void listerSeancesAVenirDuFilm_filmExiste_retourneLesSeances() {
+        when(filmRepository.existsById(1L)).thenReturn(true);
+        when(seanceRepository.trouverSeancesAVenirDuFilm(eq(1L), any(LocalDateTime.class))).thenReturn(List.of(seance));
+
+        List<Seance> resultat = seanceService.listerSeancesAVenirDuFilm(1L);
+
+        assertEquals(1, resultat.size());
+        assertEquals(seance, resultat.get(0));
+    }
+
+    @Test
+    void listerSeancesAVenirDuFilm_aucuneSeance_retourneListeVide() {
+        when(filmRepository.existsById(1L)).thenReturn(true);
+        when(seanceRepository.trouverSeancesAVenirDuFilm(eq(1L), any(LocalDateTime.class))).thenReturn(List.of());
+
+        List<Seance> resultat = seanceService.listerSeancesAVenirDuFilm(1L);
+
+        assertTrue(resultat.isEmpty());
+    }
+
+    @Test
+    void listerSeancesAVenirDuFilm_filmInexistant_leveException() {
+        when(filmRepository.existsById(99L)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> seanceService.listerSeancesAVenirDuFilm(99L));
+        verify(seanceRepository, never()).trouverSeancesAVenirDuFilm(anyLong(), any(LocalDateTime.class));
+    }
+
+    @Test
+    void compterPlacesLibres_retourneLeNombreDePlacesLibres() {
+        when(placeRepository.countBySeanceIdAndStatut(1L, Place.StatutPlace.LIBRE)).thenReturn(70L);
+
+        long resultat = seanceService.compterPlacesLibres(1L);
+
+        assertEquals(70L, resultat);
     }
 
     @Test
