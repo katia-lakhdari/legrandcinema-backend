@@ -16,4 +16,7 @@ public interface SeanceRepository extends JpaRepository<Seance, Long> {
 
     @Query("SELECT DISTINCT s.film FROM Seance s WHERE s.dateHeure > :maintenant")
     List<Film> trouverFilmsAvecSeanceAVenir(@Param("maintenant") LocalDateTime maintenant);
+
+    @Query("SELECT s FROM Seance s WHERE s.salle.id = :salleId")
+    List<Seance> trouverSeancesDeLaSalle(@Param("salleId") Long salleId);
 }
