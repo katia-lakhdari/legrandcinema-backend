@@ -1,6 +1,7 @@
 package com.legrandcinema.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,6 +16,7 @@ public class FilmRequest {
     @NotBlank(message = "Le genre est obligatoire")
     private String genre;
 
+    @NotNull(message = "La durée est obligatoire")
     @Positive(message = "La durée doit être un nombre positif")
     private Integer duree;
 
