@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -48,9 +49,12 @@ class ReservationServiceTest {
     private Seance seance;
     private Place place;
     private static final String EMAIL = "katia@legrandcinema.com";
+    private static final long DELAI_MINUTES = 5L;
 
     @BeforeEach
     void initialisation() {
+        ReflectionTestUtils.setField(reservationService, "delaiVerrouillageMinutes", DELAI_MINUTES);
+
         utilisateur = new Utilisateur();
         utilisateur.setId(1L);
         utilisateur.setEmail(EMAIL);
@@ -68,7 +72,7 @@ class ReservationServiceTest {
     }
 
     @Test
-    void creerReservation_placeValide_creeReservationAvecSucces() {
+    void creerReservation_placeValide_gardeLaPlaceVerrouilleeAvecNouveauDelai() {
         ReservationRequest requete = new ReservationRequest();
         requete.setSeanceId(10L);
         requete.setPlaceIds(List.of(100L));
@@ -79,14 +83,48 @@ class ReservationServiceTest {
         when(reservationRepository.save(any(Reservation.class))).thenAnswer(i -> i.getArgument(0));
         when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
 
+        LocalDateTime avant = LocalDateTime.now();
         Reservation resultat = reservationService.creerReservation(requete, EMAIL);
+        LocalDateTime apres = LocalDateTime.now();
 
         assertEquals(StatutReservation.EN_ATTENTE_PAIEMENT, resultat.getStatut());
-        assertEquals(StatutPlace.RESERVEE, place.getStatut());
-        assertNull(place.getFinVerrouillage());
-        assertNull(place.getUtilisateurVerrouillage());
+        assertEquals(StatutPlace.VERROUILLEE, place.getStatut());
+        assertEquals(utilisateur, place.getUtilisateurVerrouillage());
+        assertEquals(resultat, place.getReservation());
+        assertNotNull(place.getFinVerrouillage());
+        assertFalse(place.getFinVerrouillage().isBefore(avant.plusMinutes(DELAI_MINUTES)));
+        assertFalse(place.getFinVerrouillage().isAfter(apres.plusMinutes(DELAI_MINUTES)));
         verify(reservationRepository).save(any(Reservation.class));
         verify(placeRepository).save(place);
+    }
+
+    @Test
+    void creerReservation_deuxPlaces_partagentLaMemeFinDeDelai() {
+        Place deuxiemePlace = new Place();
+        deuxiemePlace.setId(101L);
+        deuxiemePlace.setNumero("A13");
+        deuxiemePlace.setSeance(seance);
+        deuxiemePlace.setStatut(StatutPlace.VERROUILLEE);
+        deuxiemePlace.setFinVerrouillage(LocalDateTime.now().plusMinutes(1));
+        deuxiemePlace.setUtilisateurVerrouillage(utilisateur);
+
+        ReservationRequest requete = new ReservationRequest();
+        requete.setSeanceId(10L);
+        requete.setPlaceIds(List.of(100L, 101L));
+
+        when(utilisateurRepository.findByEmail(EMAIL)).thenReturn(Optional.of(utilisateur));
+        when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
+        when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
+        when(placeRepository.findById(101L)).thenReturn(Optional.of(deuxiemePlace));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(i -> i.getArgument(0));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Reservation resultat = reservationService.creerReservation(requete, EMAIL);
+
+        assertEquals(2, resultat.getPlaces().size());
+        assertEquals(place.getFinVerrouillage(), deuxiemePlace.getFinVerrouillage());
+        assertEquals(StatutPlace.VERROUILLEE, deuxiemePlace.getStatut());
+        verify(placeRepository, times(2)).save(any(Place.class));
     }
 
     @Test
