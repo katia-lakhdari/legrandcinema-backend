@@ -34,6 +34,7 @@ public class PaiementService {
 
     private static final String STATUT_STRIPE_REUSSI = "succeeded";
     private static final String STATUT_STRIPE_REFUSE = "requires_payment_method";
+    private static final String STATUT_STRIPE_ANNULE = "canceled";
 
     private final ReservationRepository reservationRepository;
     private final UtilisateurRepository utilisateurRepository;
@@ -167,6 +168,47 @@ public class PaiementService {
         );
     }
 
+    public void annulerOuRembourserIntention(Reservation reservation) {
+        String paymentIntentId = reservation.getPaymentIntentId();
+        if (paymentIntentId == null) {
+            return;
+        }
+
+        PaymentIntent paymentIntent;
+        try {
+            paymentIntent = PaymentIntent.retrieve(paymentIntentId);
+        } catch (StripeException e) {
+            LOGGER.warn("Impossible de lire l'intention de paiement {} de la réservation annulée {}",
+                    paymentIntentId, reservation.getId(), e);
+            return;
+        }
+
+        String statut = paymentIntent.getStatus();
+
+        if (STATUT_STRIPE_REUSSI.equals(statut)) {
+            try {
+                effectuerRemboursement(paymentIntent, reservation);
+            } catch (StripeException e) {
+                LOGGER.error("Échec du remboursement du paiement {} pour la réservation annulée {}",
+                        paymentIntentId, reservation.getId(), e);
+            }
+            return;
+        }
+
+        if (STATUT_STRIPE_ANNULE.equals(statut)) {
+            return;
+        }
+
+        try {
+            paymentIntent.cancel();
+            LOGGER.info("Intention de paiement {} annulée : délai dépassé pour la réservation {}",
+                    paymentIntentId, reservation.getId());
+        } catch (StripeException e) {
+            LOGGER.warn("Impossible d'annuler l'intention de paiement {} de la réservation {}",
+                    paymentIntentId, reservation.getId(), e);
+        }
+    }
+
     private Reservation trouverReservationDuClient(Long reservationId, String emailUtilisateur) {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Réservation introuvable"));
@@ -231,23 +273,27 @@ public class PaiementService {
 
     private void rembourser(PaymentIntent paymentIntent, Reservation reservation) {
         try {
-            RefundCreateParams parametres = RefundCreateParams.builder()
-                    .setPaymentIntent(paymentIntent.getId())
-                    .build();
-
-            RequestOptions options = RequestOptions.builder()
-                    .setIdempotencyKey("remboursement-" + paymentIntent.getId())
-                    .build();
-
-            Refund.create(parametres, options);
-            LOGGER.info("Paiement {} remboursé : délai dépassé pour la réservation {}",
-                    paymentIntent.getId(), reservation.getId());
+            effectuerRemboursement(paymentIntent, reservation);
         } catch (StripeException e) {
             LOGGER.error("Échec du remboursement du paiement {} pour la réservation {}",
                     paymentIntent.getId(), reservation.getId(), e);
             throw new RuntimeException(
                     "Le délai de paiement est dépassé et le remboursement automatique a échoué : contactez le cinéma");
         }
+    }
+
+    private void effectuerRemboursement(PaymentIntent paymentIntent, Reservation reservation) throws StripeException {
+        RefundCreateParams parametres = RefundCreateParams.builder()
+                .setPaymentIntent(paymentIntent.getId())
+                .build();
+
+        RequestOptions options = RequestOptions.builder()
+                .setIdempotencyKey("remboursement-" + paymentIntent.getId())
+                .build();
+
+        Refund.create(parametres, options);
+        LOGGER.info("Paiement {} remboursé : délai dépassé pour la réservation {}",
+                paymentIntent.getId(), reservation.getId());
     }
 
     private BigDecimal calculerMontantEnEuros(Reservation reservation) {
