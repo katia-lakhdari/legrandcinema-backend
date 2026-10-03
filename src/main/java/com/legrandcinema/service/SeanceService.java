@@ -13,6 +13,7 @@ import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,6 +57,8 @@ public class SeanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Film introuvable"));
         Salle salle = salleRepository.findById(request.getSalleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Salle introuvable"));
+
+        verifierSalleLibre(salle, film, request.getDateHeure(), null);
 
         Seance seance = new Seance();
         seance.setFilm(film);
@@ -105,8 +108,13 @@ public class SeanceService {
         Salle salle = salleRepository.findById(request.getSalleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Salle introuvable"));
 
+        if (!seance.getSalle().getId().equals(salle.getId())) {
+            throw new RuntimeException("Impossible de changer la salle d'une séance : supprimez-la et créez-en une nouvelle");
+        }
+
+        verifierSalleLibre(salle, film, request.getDateHeure(), seance.getId());
+
         seance.setFilm(film);
-        seance.setSalle(salle);
         seance.setDateHeure(request.getDateHeure());
         seance.setPrix(request.getPrix());
         return seanceRepository.save(seance);
@@ -115,5 +123,26 @@ public class SeanceService {
     public void supprimerSeance(Long id) {
         Seance seance = trouverParId(id);
         seanceRepository.delete(seance);
+    }
+
+    private void verifierSalleLibre(Salle salle, Film film, LocalDateTime debut, Long idSeanceAIgnorer) {
+        LocalDateTime fin = debut.plusMinutes(film.getDuree());
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("dd/MM/yyyy 'à' HH:mm");
+
+        List<Seance> seancesDeLaSalle = seanceRepository.trouverSeancesDeLaSalle(salle.getId());
+
+        for (Seance autreSeance : seancesDeLaSalle) {
+            if (autreSeance.getId().equals(idSeanceAIgnorer)) {
+                continue;
+            }
+
+            LocalDateTime debutAutre = autreSeance.getDateHeure();
+            LocalDateTime finAutre = debutAutre.plusMinutes(autreSeance.getFilm().getDuree());
+
+            if (debut.isBefore(finAutre) && debutAutre.isBefore(fin)) {
+                throw new RuntimeException("La salle est déjà occupée du "
+                        + debutAutre.format(format) + " au " + finAutre.format(format));
+            }
+        }
     }
 }

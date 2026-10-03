@@ -48,12 +48,14 @@ class SeanceServiceTest {
     private Film film;
     private Salle salle;
     private Seance seance;
+    private Seance autreSeance;
     private SeanceRequest request;
 
     @BeforeEach
     void setUp() {
         film = new Film();
         film.setId(1L);
+        film.setDuree(120);
 
         salle = new Salle();
         salle.setId(1L);
@@ -65,6 +67,13 @@ class SeanceServiceTest {
         seance.setSalle(salle);
         seance.setDateHeure(LocalDateTime.now().plusDays(1));
         seance.setPrix(new BigDecimal("9.50"));
+
+        autreSeance = new Seance();
+        autreSeance.setId(2L);
+        autreSeance.setFilm(film);
+        autreSeance.setSalle(salle);
+        autreSeance.setDateHeure(LocalDateTime.of(2026, 12, 15, 18, 0));
+        autreSeance.setPrix(new BigDecimal("9.50"));
 
         request = new SeanceRequest();
         request.setFilmId(1L);
@@ -168,6 +177,52 @@ class SeanceServiceTest {
     }
 
     @Test
+    void creerSeance_pendantUneAutreSeance_leveException() {
+        request.setDateHeure(LocalDateTime.of(2026, 12, 15, 19, 0));
+
+        when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
+        when(salleRepository.findById(1L)).thenReturn(Optional.of(salle));
+        when(seanceRepository.trouverSeancesDeLaSalle(1L)).thenReturn(List.of(autreSeance));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> seanceService.creerSeance(request));
+
+        assertEquals("La salle est déjà occupée du 15/12/2026 à 18:00 au 15/12/2026 à 20:00", exception.getMessage());
+        verify(seanceRepository, never()).save(any(Seance.class));
+        verify(placeRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void creerSeance_finitPendantUneAutreSeance_leveException() {
+        request.setDateHeure(LocalDateTime.of(2026, 12, 15, 17, 0));
+
+        when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
+        when(salleRepository.findById(1L)).thenReturn(Optional.of(salle));
+        when(seanceRepository.trouverSeancesDeLaSalle(1L)).thenReturn(List.of(autreSeance));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> seanceService.creerSeance(request));
+
+        assertEquals("La salle est déjà occupée du 15/12/2026 à 18:00 au 15/12/2026 à 20:00", exception.getMessage());
+        verify(seanceRepository, never()).save(any(Seance.class));
+    }
+
+    @Test
+    void creerSeance_commenceQuandUneAutreFinit_estAcceptee() {
+        request.setDateHeure(LocalDateTime.of(2026, 12, 15, 20, 0));
+
+        when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
+        when(salleRepository.findById(1L)).thenReturn(Optional.of(salle));
+        when(seanceRepository.trouverSeancesDeLaSalle(1L)).thenReturn(List.of(autreSeance));
+        when(seanceRepository.save(any(Seance.class))).thenReturn(seance);
+
+        seanceService.creerSeance(request);
+
+        verify(seanceRepository, times(1)).save(any(Seance.class));
+        verify(placeRepository, times(1)).saveAll(anyList());
+    }
+
+    @Test
     void modifierSeance_casNominal_retourneLaSeanceModifiee() {
         request.setPrix(new BigDecimal("12.00"));
         Seance seanceModifiee = new Seance();
@@ -182,6 +237,40 @@ class SeanceServiceTest {
         Seance resultat = seanceService.modifierSeance(1L, request);
 
         assertEquals(new BigDecimal("12.00"), resultat.getPrix());
+    }
+
+    @Test
+    void modifierSeance_neSeComparePasAvecElleMeme_estAcceptee() {
+        request.setDateHeure(seance.getDateHeure());
+        request.setPrix(new BigDecimal("12.00"));
+
+        when(seanceRepository.findById(1L)).thenReturn(Optional.of(seance));
+        when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
+        when(salleRepository.findById(1L)).thenReturn(Optional.of(salle));
+        when(seanceRepository.trouverSeancesDeLaSalle(1L)).thenReturn(List.of(seance));
+        when(seanceRepository.save(any(Seance.class))).thenReturn(seance);
+
+        seanceService.modifierSeance(1L, request);
+
+        verify(seanceRepository, times(1)).save(seance);
+        assertEquals(new BigDecimal("12.00"), seance.getPrix());
+    }
+
+    @Test
+    void modifierSeance_changementDeSalle_leveException() {
+        Salle autreSalle = new Salle();
+        autreSalle.setId(2L);
+        request.setSalleId(2L);
+
+        when(seanceRepository.findById(1L)).thenReturn(Optional.of(seance));
+        when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
+        when(salleRepository.findById(2L)).thenReturn(Optional.of(autreSalle));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> seanceService.modifierSeance(1L, request));
+
+        assertEquals("Impossible de changer la salle d'une séance : supprimez-la et créez-en une nouvelle", exception.getMessage());
+        verify(seanceRepository, never()).save(any(Seance.class));
     }
 
     @Test
