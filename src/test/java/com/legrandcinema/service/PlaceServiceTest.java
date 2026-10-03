@@ -2,6 +2,7 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Place.StatutPlace;
+import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +24,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PlaceServiceTest {
+
+    private static final long DELAI_MINUTES = 5L;
 
     @Mock
     private PlaceRepository placeRepository;
@@ -38,6 +42,8 @@ class PlaceServiceTest {
 
     @BeforeEach
     void initialisation() {
+        ReflectionTestUtils.setField(placeService, "delaiVerrouillageMinutes", DELAI_MINUTES);
+
         place = new Place();
         place.setId(1L);
         place.setNumero("A12");
@@ -52,17 +58,27 @@ class PlaceServiceTest {
         autreUtilisateur.setEmail("autre@legrandcinema.com");
     }
 
+    private Reservation creerReservationEnAttente() {
+        Reservation reservation = new Reservation();
+        reservation.setId(50L);
+        reservation.setStatut(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT);
+        return reservation;
+    }
+
     @Test
     void verrouillerPlace_placeLibre_verrouilleAvecSucces() {
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
         when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
 
+        LocalDateTime avant = LocalDateTime.now();
         Place resultat = placeService.verrouillerPlace(1L, "katia@legrandcinema.com");
+        LocalDateTime apres = LocalDateTime.now();
 
         assertEquals(StatutPlace.VERROUILLEE, resultat.getStatut());
         assertNotNull(resultat.getFinVerrouillage());
-        assertTrue(resultat.getFinVerrouillage().isAfter(LocalDateTime.now()));
+        assertFalse(resultat.getFinVerrouillage().isBefore(avant.plusMinutes(DELAI_MINUTES)));
+        assertFalse(resultat.getFinVerrouillage().isAfter(apres.plusMinutes(DELAI_MINUTES)));
         assertEquals(utilisateur, resultat.getUtilisateurVerrouillage());
     }
 
@@ -99,10 +115,29 @@ class PlaceServiceTest {
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
         when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
 
+        LocalDateTime avant = LocalDateTime.now();
         Place resultat = placeService.verrouillerPlace(1L, "katia@legrandcinema.com");
+        LocalDateTime apres = LocalDateTime.now();
 
         assertEquals(StatutPlace.VERROUILLEE, resultat.getStatut());
-        assertTrue(resultat.getFinVerrouillage().isAfter(LocalDateTime.now()));
+        assertFalse(resultat.getFinVerrouillage().isBefore(avant.plusMinutes(DELAI_MINUTES)));
+        assertFalse(resultat.getFinVerrouillage().isAfter(apres.plusMinutes(DELAI_MINUTES)));
+        assertEquals(utilisateur, resultat.getUtilisateurVerrouillage());
+    }
+
+    @Test
+    void verrouillerPlace_placeExpireeAvecReservation_resteIndisponible() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
+        place.setUtilisateurVerrouillage(autreUtilisateur);
+        place.setReservation(creerReservationEnAttente());
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
+
+        assertEquals("Cette place est déjà en cours de sélection par un autre client", exception.getMessage());
+        verify(placeRepository, never()).save(any());
     }
 
     @Test
@@ -127,6 +162,23 @@ class PlaceServiceTest {
         assertEquals(StatutPlace.LIBRE, resultat.getStatut());
         assertNull(resultat.getFinVerrouillage());
         assertNull(resultat.getUtilisateurVerrouillage());
+    }
+
+    @Test
+    void libererPlace_placeRattacheeAUneReservation_leveException() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
+        place.setUtilisateurVerrouillage(utilisateur);
+        place.setReservation(creerReservationEnAttente());
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
+
+        assertEquals("Cette place fait partie d'une réservation en attente de paiement, impossible de la libérer seule",
+                exception.getMessage());
+        assertEquals(StatutPlace.VERROUILLEE, place.getStatut());
+        verify(placeRepository, never()).save(any());
     }
 
     @Test
@@ -206,6 +258,21 @@ class PlaceServiceTest {
 
         assertEquals(StatutPlace.LIBRE, resultat.get(0).getStatut());
         verify(placeRepository).save(place);
+    }
+
+    @Test
+    void listerPlacesParSeance_placeExpireeAvecReservation_nEstPasLiberee() {
+        place.setStatut(StatutPlace.VERROUILLEE);
+        place.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
+        place.setUtilisateurVerrouillage(utilisateur);
+        place.setReservation(creerReservationEnAttente());
+        when(placeRepository.findBySeanceId(10L)).thenReturn(List.of(place));
+
+        List<Place> resultat = placeService.listerPlacesParSeance(10L);
+
+        assertEquals(StatutPlace.VERROUILLEE, resultat.get(0).getStatut());
+        assertEquals(utilisateur, resultat.get(0).getUtilisateurVerrouillage());
+        verify(placeRepository, never()).save(any());
     }
 
     @Test
