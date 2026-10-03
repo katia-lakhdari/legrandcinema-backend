@@ -58,8 +58,10 @@ public class BilletController {
                             billet.getId(),
                             billet.getQrCode(),
                             billet.isScanne(),
+                            reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom(),
                             reservation.getSeance().getFilm().getTitre(),
                             reservation.getSeance().getDateHeure().toString(),
+                            reservation.getSeance().getSalle().getNom(),
                             numerosPlaces
                     );
                 })
