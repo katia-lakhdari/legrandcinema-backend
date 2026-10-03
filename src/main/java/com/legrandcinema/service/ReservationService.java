@@ -11,6 +11,7 @@ import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -31,6 +32,9 @@ public class ReservationService {
 
     @Autowired
     private UtilisateurRepository utilisateurRepository;
+
+    @Value("${reservation.delai-verrouillage-minutes}")
+    private long delaiVerrouillageMinutes;
 
     public Reservation creerReservation(ReservationRequest requete, String emailUtilisateur) {
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
@@ -72,11 +76,11 @@ public class ReservationService {
         reservation.setDateReservation(LocalDateTime.now());
         reservation = reservationRepository.save(reservation);
 
+        LocalDateTime finDelaiPaiement = LocalDateTime.now().plusMinutes(delaiVerrouillageMinutes);
+
         for (Place place : places) {
             place.setReservation(reservation);
-            place.setStatut(Place.StatutPlace.RESERVEE);
-            place.setFinVerrouillage(null);
-            place.setUtilisateurVerrouillage(null);
+            place.setFinVerrouillage(finDelaiPaiement);
             placeRepository.save(place);
         }
 
