@@ -642,4 +642,128 @@ class PaiementServiceTest {
         assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
         verify(emailService, never()).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
     }
+
+    @Test
+    void annulerOuRembourserIntention_sansIntention_nAppellePasStripe() {
+        reservation.setPaymentIntentId(null);
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+
+            stripeMocke.verify(() -> PaymentIntent.retrieve(anyString()), never());
+        }
+
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void annulerOuRembourserIntention_paiementReussi_rembourse() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getId()).thenReturn("pi_test_123");
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+            remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
+                    .thenReturn(mock(Refund.class));
+
+            paiementService.annulerOuRembourserIntention(reservation);
+
+            remboursementMocke.verify(() -> Refund.create(
+                    argThat((RefundCreateParams parametres) -> "pi_test_123".equals(parametres.getPaymentIntent())),
+                    argThat((RequestOptions options) -> "remboursement-pi_test_123".equals(options.getIdempotencyKey()))
+            ));
+        }
+
+        verify(paymentIntentMock, never()).cancel();
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void annulerOuRembourserIntention_intentionOuverte_annuleChezStripe() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("requires_payment_method");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            paiementService.annulerOuRembourserIntention(reservation);
+
+            remboursementMocke.verify(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)), never());
+        }
+
+        verify(paymentIntentMock, times(1)).cancel();
+    }
+
+    @Test
+    void annulerOuRembourserIntention_intentionDejaAnnulee_neFaitRien() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("canceled");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            paiementService.annulerOuRembourserIntention(reservation);
+
+            remboursementMocke.verify(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)), never());
+        }
+
+        verify(paymentIntentMock, never()).cancel();
+    }
+
+    @Test
+    void annulerOuRembourserIntention_stripeIllisible_neLevePasDException() {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123"))
+                    .thenThrow(new ApiConnectionException("Stripe injoignable"));
+
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+        }
+    }
+
+    @Test
+    void annulerOuRembourserIntention_remboursementEchoue_neLevePasDException() {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getId()).thenReturn("pi_test_123");
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+            remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
+                    .thenThrow(new ApiConnectionException("Stripe injoignable"));
+
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+        }
+    }
+
+    @Test
+    void annulerOuRembourserIntention_annulationEchoue_neLevePasDException() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("requires_payment_method");
+        when(paymentIntentMock.cancel()).thenThrow(new ApiConnectionException("Stripe injoignable"));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+        }
+
+        verify(paymentIntentMock, times(1)).cancel();
+    }
 }
