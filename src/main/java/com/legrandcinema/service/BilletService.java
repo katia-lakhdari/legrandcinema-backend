@@ -42,7 +42,7 @@ public class BilletService {
                 .orElseThrow(() -> new ResourceNotFoundException("Billet introuvable"));
 
         if (billet.isScanne()) {
-            throw new RuntimeException("Ce billet a déjà été scanné");
+            throw new RuntimeException("Billet déjà utilisé");
         }
 
         billet.setScanne(true);

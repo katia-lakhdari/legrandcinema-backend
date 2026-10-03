@@ -108,7 +108,7 @@ class BilletServiceTest {
         RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> billetService.scannerBillet("qr-code-test-123"));
 
-        assertEquals("Ce billet a déjà été scanné", exception.getMessage());
+        assertEquals("Billet déjà utilisé", exception.getMessage());
         verify(billetRepository, never()).save(any(Billet.class));
     }
 
