@@ -1,11 +1,16 @@
 package com.legrandcinema.exception;
 
 import com.legrandcinema.dto.response.ErreurResponse;
+import com.legrandcinema.dto.response.ErreurValidationResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -17,13 +22,18 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErreurResponse> gererErreurValidation(MethodArgumentNotValidException exception) {
-        String message = exception.getBindingResult()
-                .getFieldErrors()
-                .get(0)
-                .getDefaultMessage();
-        ErreurResponse erreur = new ErreurResponse(message, HttpStatus.BAD_REQUEST.value());
-        return new ResponseEntity<>(erreur, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<ErreurValidationResponse> gererErreurValidation(MethodArgumentNotValidException exception) {
+        Map<String, String> erreurs = new LinkedHashMap<>();
+        for (FieldError erreurChamp : exception.getBindingResult().getFieldErrors()) {
+            erreurs.putIfAbsent(erreurChamp.getField(), erreurChamp.getDefaultMessage());
+        }
+
+        ErreurValidationResponse reponse = new ErreurValidationResponse(
+                "Données invalides",
+                HttpStatus.BAD_REQUEST.value(),
+                erreurs
+        );
+        return new ResponseEntity<>(reponse, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(RuntimeException.class)

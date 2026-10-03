@@ -4,6 +4,7 @@ import com.legrandcinema.entity.Salle;
 import com.legrandcinema.service.SalleService;
 import com.legrandcinema.dto.request.SalleRequest;
 import com.legrandcinema.dto.response.SalleResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -32,14 +33,14 @@ public class SalleController {
     }
 
     @PostMapping
-    public SalleResponse creerSalle(@RequestBody SalleRequest request) {
+    public SalleResponse creerSalle(@Valid @RequestBody SalleRequest request) {
         Salle salle = salleService.creerSalle(request);
         return new SalleResponse(salle.getId(), salle.getNom(),
                 salle.getType().name(), salle.getCapacite());
     }
 
     @PutMapping("/{id}")
-    public SalleResponse modifierSalle(@PathVariable Long id, @RequestBody SalleRequest request) {
+    public SalleResponse modifierSalle(@PathVariable Long id, @Valid @RequestBody SalleRequest request) {
         Salle salle = salleService.modifierSalle(id, request);
         return new SalleResponse(salle.getId(), salle.getNom(),
                 salle.getType().name(), salle.getCapacite());
