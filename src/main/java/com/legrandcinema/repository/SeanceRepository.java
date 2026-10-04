@@ -21,4 +21,6 @@ public interface SeanceRepository extends JpaRepository<Seance, Long> {
     List<Seance> trouverSeancesDeLaSalle(@Param("salleId") Long salleId);
 
     boolean existsByFilmId(Long filmId);
+
+    boolean existsBySalleId(Long salleId);
 }
