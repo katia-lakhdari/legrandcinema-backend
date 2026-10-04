@@ -8,7 +8,6 @@ import com.legrandcinema.entity.Seance;
 import com.legrandcinema.service.FilmService;
 import com.legrandcinema.service.SeanceService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,36 +16,32 @@ import java.util.List;
 @RequestMapping("/api/films")
 public class FilmController {
 
-    @Autowired
-    private FilmService filmService;
+    private final FilmService filmService;
+    private final SeanceService seanceService;
 
-    @Autowired
-    private SeanceService seanceService;
+    public FilmController(FilmService filmService, SeanceService seanceService) {
+        this.filmService = filmService;
+        this.seanceService = seanceService;
+    }
 
     @GetMapping
     public List<FilmResponse> listerFilms() {
-        List<Film> films = filmService.listerTousLesFilms();
-        List<FilmResponse> reponses = new java.util.ArrayList<>();
-        for (Film film : films) {
-            reponses.add(new FilmResponse(film.getId(), film.getTitre(), film.getGenre(), film.getDuree(), film.getAffiche(), film.getDescription()));
-        }
-        return reponses;
+        return filmService.listerTousLesFilms().stream()
+                .map(FilmResponse::new)
+                .toList();
     }
 
     @GetMapping("/a-l-affiche")
     public List<FilmResponse> listerFilmsAlAffiche() {
-        List<Film> films = filmService.listerFilmsAlAffiche();
-        List<FilmResponse> reponses = new java.util.ArrayList<>();
-        for (Film film : films) {
-            reponses.add(new FilmResponse(film.getId(), film.getTitre(), film.getGenre(), film.getDuree(), film.getAffiche(), film.getDescription()));
-        }
-        return reponses;
+        return filmService.listerFilmsAlAffiche().stream()
+                .map(FilmResponse::new)
+                .toList();
     }
 
     @GetMapping("/{id}")
     public FilmResponse trouverFilm(@PathVariable Long id) {
         Film film = filmService.trouverParId(id);
-        return new FilmResponse(film.getId(), film.getTitre(), film.getGenre(), film.getDuree(), film.getAffiche(), film.getDescription());
+        return new FilmResponse(film);
     }
 
     @GetMapping("/{id}/seances")
@@ -60,13 +55,13 @@ public class FilmController {
     @PostMapping
     public FilmResponse creerFilm(@Valid @RequestBody FilmRequest request) {
         Film film = filmService.creerFilm(request);
-        return new FilmResponse(film.getId(), film.getTitre(), film.getGenre(), film.getDuree(), film.getAffiche(), film.getDescription());
+        return new FilmResponse(film);
     }
 
     @PutMapping("/{id}")
     public FilmResponse modifierFilm(@PathVariable Long id, @Valid @RequestBody FilmRequest request) {
         Film film = filmService.modifierFilm(id, request);
-        return new FilmResponse(film.getId(), film.getTitre(), film.getGenre(), film.getDuree(), film.getAffiche(), film.getDescription());
+        return new FilmResponse(film);
     }
 
     @DeleteMapping("/{id}")
