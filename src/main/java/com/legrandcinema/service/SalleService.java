@@ -2,6 +2,7 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Salle;
 import com.legrandcinema.repository.SalleRepository;
+import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.dto.request.SalleRequest;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,9 @@ public class SalleService {
 
     @Autowired
     private SalleRepository salleRepository;
+
+    @Autowired
+    private SeanceRepository seanceRepository;
 
     public List<Salle> listerToutesLesSalles() {
         return salleRepository.findAll();
@@ -41,6 +45,11 @@ public class SalleService {
 
     public void supprimerSalle(Long id) {
         Salle salle = trouverParId(id);
+
+        if (seanceRepository.existsBySalleId(id)) {
+            throw new RuntimeException("Impossible de supprimer cette salle : elle a des séances programmées");
+        }
+
         salleRepository.delete(salle);
     }
 

@@ -8,11 +8,13 @@ import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SalleRepository;
 import com.legrandcinema.repository.PlaceRepository;
+import com.legrandcinema.repository.ReservationRepository;
 import com.legrandcinema.dto.request.SeanceRequest;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -41,6 +43,9 @@ class SeanceServiceTest {
 
     @Mock
     private PlaceRepository placeRepository;
+
+    @Mock
+    private ReservationRepository reservationRepository;
 
     @InjectMocks
     private SeanceService seanceService;
@@ -293,19 +298,61 @@ class SeanceServiceTest {
     }
 
     @Test
-    void supprimerSeance_casNominal_supprimeLaSeance() {
+    void supprimerSeance_casNominal_supprimeLesPlacesPuisLaSeance() {
+        Place place1 = new Place();
+        place1.setNumero("A1");
+        Place place2 = new Place();
+        place2.setNumero("A2");
+        List<Place> places = List.of(place1, place2);
+
         when(seanceRepository.findById(1L)).thenReturn(Optional.of(seance));
+        when(reservationRepository.existsBySeanceId(1L)).thenReturn(false);
+        when(placeRepository.existsBySeanceIdAndStatutNot(1L, Place.StatutPlace.LIBRE)).thenReturn(false);
+        when(placeRepository.findBySeanceId(1L)).thenReturn(places);
 
         seanceService.supprimerSeance(1L);
 
-        verify(seanceRepository, times(1)).delete(seance);
+        InOrder ordre = inOrder(placeRepository, seanceRepository);
+        ordre.verify(placeRepository).deleteAll(places);
+        ordre.verify(seanceRepository).delete(seance);
     }
 
     @Test
-    void supprimerSeance_seanceInexistante_leveException() {
+    void supprimerSeance_avecReservation_refuseEtNeSupprimeRien() {
+        when(seanceRepository.findById(1L)).thenReturn(Optional.of(seance));
+        when(reservationRepository.existsBySeanceId(1L)).thenReturn(true);
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> seanceService.supprimerSeance(1L));
+
+        assertEquals("Impossible de supprimer cette séance : elle a des réservations", exception.getMessage());
+        verify(placeRepository, never()).existsBySeanceIdAndStatutNot(anyLong(), any(Place.StatutPlace.class));
+        verify(placeRepository, never()).deleteAll(anyList());
+        verify(seanceRepository, never()).delete(any(Seance.class));
+    }
+
+    @Test
+    void supprimerSeance_placeNonLibre_refuseEtNeSupprimeRien() {
+        when(seanceRepository.findById(1L)).thenReturn(Optional.of(seance));
+        when(reservationRepository.existsBySeanceId(1L)).thenReturn(false);
+        when(placeRepository.existsBySeanceIdAndStatutNot(1L, Place.StatutPlace.LIBRE)).thenReturn(true);
+
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> seanceService.supprimerSeance(1L));
+
+        assertEquals("Impossible de supprimer cette séance : des places sont en cours de sélection", exception.getMessage());
+        verify(placeRepository, never()).deleteAll(anyList());
+        verify(seanceRepository, never()).delete(any(Seance.class));
+    }
+
+    @Test
+    void supprimerSeance_seanceInexistante_leve404SansRienConsulter() {
         when(seanceRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> seanceService.supprimerSeance(99L));
+
+        verify(reservationRepository, never()).existsBySeanceId(anyLong());
+        verify(placeRepository, never()).deleteAll(anyList());
         verify(seanceRepository, never()).delete(any(Seance.class));
     }
 }

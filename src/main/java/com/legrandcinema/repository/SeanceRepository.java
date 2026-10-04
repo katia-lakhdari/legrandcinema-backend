@@ -19,4 +19,8 @@ public interface SeanceRepository extends JpaRepository<Seance, Long> {
 
     @Query("SELECT s FROM Seance s WHERE s.salle.id = :salleId")
     List<Seance> trouverSeancesDeLaSalle(@Param("salleId") Long salleId);
+
+    boolean existsByFilmId(Long filmId);
+
+    boolean existsBySalleId(Long salleId);
 }

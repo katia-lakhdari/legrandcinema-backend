@@ -13,4 +13,6 @@ public interface PlaceRepository extends JpaRepository<Place, Long> {
     long countBySeanceIdAndStatut(Long seanceId, Place.StatutPlace statut);
 
     List<Place> findByStatutAndFinVerrouillageBefore(Place.StatutPlace statut, LocalDateTime date);
+
+    boolean existsBySeanceIdAndStatutNot(Long seanceId, Place.StatutPlace statut);
 }
