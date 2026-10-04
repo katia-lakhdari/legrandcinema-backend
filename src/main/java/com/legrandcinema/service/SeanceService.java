@@ -1,19 +1,19 @@
 package com.legrandcinema.service;
 
-import com.legrandcinema.entity.Seance;
+import com.legrandcinema.dto.request.SeanceRequest;
 import com.legrandcinema.entity.Film;
-import com.legrandcinema.entity.Salle;
 import com.legrandcinema.entity.Place;
-import com.legrandcinema.repository.SeanceRepository;
+import com.legrandcinema.entity.Salle;
+import com.legrandcinema.entity.Seance;
+import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.FilmRepository;
-import com.legrandcinema.repository.SalleRepository;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
-import com.legrandcinema.dto.request.SeanceRequest;
-import com.legrandcinema.exception.ResourceNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.legrandcinema.repository.SalleRepository;
+import com.legrandcinema.repository.SeanceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -22,20 +22,23 @@ import java.util.List;
 @Service
 public class SeanceService {
 
-    @Autowired
-    private SeanceRepository seanceRepository;
+    private final SeanceRepository seanceRepository;
+    private final FilmRepository filmRepository;
+    private final SalleRepository salleRepository;
+    private final PlaceRepository placeRepository;
+    private final ReservationRepository reservationRepository;
 
-    @Autowired
-    private FilmRepository filmRepository;
-
-    @Autowired
-    private SalleRepository salleRepository;
-
-    @Autowired
-    private PlaceRepository placeRepository;
-
-    @Autowired
-    private ReservationRepository reservationRepository;
+    public SeanceService(SeanceRepository seanceRepository,
+                         FilmRepository filmRepository,
+                         SalleRepository salleRepository,
+                         PlaceRepository placeRepository,
+                         ReservationRepository reservationRepository) {
+        this.seanceRepository = seanceRepository;
+        this.filmRepository = filmRepository;
+        this.salleRepository = salleRepository;
+        this.placeRepository = placeRepository;
+        this.reservationRepository = reservationRepository;
+    }
 
     public List<Seance> listerToutesLesSeances() {
         return seanceRepository.findAll();
