@@ -51,7 +51,7 @@ public class BilletService {
 
     public List<Billet> mesBillets(String emailUtilisateur) {
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         return billetRepository.findByReservationUtilisateurId(utilisateur.getId());
     }
