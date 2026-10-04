@@ -12,12 +12,12 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
+    private static final long DUREE_VALIDITE_MS = 3600000;
+
     @Value("${jwt.secret}")
     private String cleSecrete;
 
     private SecretKey secretKey;
-
-    private final long dureeValiditeMs = 3600000;
 
     @PostConstruct
     public void init() {
@@ -26,7 +26,7 @@ public class JwtUtil {
 
     public String genererToken(String email, String role) {
         Date maintenant = new Date();
-        Date expiration = new Date(maintenant.getTime() + dureeValiditeMs);
+        Date expiration = new Date(maintenant.getTime() + DUREE_VALIDITE_MS);
 
         return Jwts.builder()
                 .subject(email)
