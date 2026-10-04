@@ -10,12 +10,16 @@ import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.exception.ResourceNotFoundException;
+import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
+import com.stripe.exception.ApiConnectionException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
+import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.PaymentIntentCreateParams;
+import com.stripe.param.RefundCreateParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,8 +27,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,11 +42,16 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PaiementServiceTest {
 
+    private static final long DELAI_MINUTES = 5L;
+
     @Mock
     private ReservationRepository reservationRepository;
 
     @Mock
     private UtilisateurRepository utilisateurRepository;
+
+    @Mock
+    private PlaceRepository placeRepository;
 
     @Mock
     private BilletService billetService;
@@ -57,11 +68,15 @@ class PaiementServiceTest {
     private Reservation reservation;
     private Utilisateur utilisateur;
     private Seance seance;
+    private Place place1;
+    private Place place2;
     private PaiementRequest requeteIntention;
     private ConfirmationPaiementRequest requeteConfirmation;
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(paiementService, "delaiVerrouillageMinutes", DELAI_MINUTES);
+
         utilisateur = new Utilisateur();
         utilisateur.setId(1L);
         utilisateur.setEmail("katia@legrandcinema.com");
@@ -70,11 +85,14 @@ class PaiementServiceTest {
         seance.setId(1L);
         seance.setPrix(new BigDecimal("10.00"));
 
+        place1 = creerPlaceVerrouillee(100L, "A1");
+        place2 = creerPlaceVerrouillee(101L, "A2");
+
         reservation = new Reservation();
         reservation.setId(1L);
         reservation.setUtilisateur(utilisateur);
         reservation.setSeance(seance);
-        reservation.setPlaces(List.of(new Place(), new Place()));
+        reservation.setPlaces(List.of(place1, place2));
         reservation.setStatut(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT);
 
         requeteIntention = new PaiementRequest();
@@ -85,8 +103,24 @@ class PaiementServiceTest {
         requeteConfirmation.setPaymentIntentId("pi_test_123");
     }
 
+    private Place creerPlaceVerrouillee(Long id, String numero) {
+        Place place = new Place();
+        place.setId(id);
+        place.setNumero(numero);
+        place.setSeance(seance);
+        place.setStatut(Place.StatutPlace.VERROUILLEE);
+        place.setUtilisateurVerrouillage(utilisateur);
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(3));
+        return place;
+    }
+
+    private void faireExpirerLesPlaces() {
+        place1.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
+        place2.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
+    }
+
     @Test
-    void creerIntentionPaiement_casNominal_retourneClientSecretEtMontant() {
+    void creerIntentionPaiement_casNominal_retourneClientSecretEtEnregistreLIdentifiant() {
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
@@ -106,8 +140,9 @@ class PaiementServiceTest {
             assertEquals(new BigDecimal("20.00"), resultat.getMontant());
         }
 
+        assertEquals("pi_test_123", reservation.getPaymentIntentId());
         assertEquals(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT, reservation.getStatut());
-        verify(reservationRepository, never()).save(any());
+        verify(reservationRepository, times(1)).save(reservation);
         verify(billetService, never()).creerBillet(any());
     }
 
@@ -151,6 +186,8 @@ class PaiementServiceTest {
             assertTrue(exception.getMessage().contains("La préparation du paiement a échoué"));
             assertTrue(exception.getMessage().contains("Clé API invalide"));
         }
+
+        verify(reservationRepository, never()).save(any());
     }
 
     @Test
@@ -214,7 +251,42 @@ class PaiementServiceTest {
     }
 
     @Test
-    void confirmerPaiement_casNominal_retournePaiementConfirme() {
+    void creerIntentionPaiement_delaiDepasse_refuseSansAppelerStripe() {
+        faireExpirerLesPlaces();
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            RuntimeException exception = assertThrows(RuntimeException.class,
+                    () -> paiementService.creerIntentionPaiement(requeteIntention, "katia@legrandcinema.com"));
+
+            assertEquals("Le délai de paiement est dépassé, veuillez refaire votre réservation", exception.getMessage());
+            stripeMocke.verify(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)), never());
+        }
+
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void creerIntentionPaiement_placeVerrouilleeParAutreClient_refuse() {
+        Utilisateur autreClient = new Utilisateur();
+        autreClient.setId(2L);
+        place2.setUtilisateurVerrouillage(autreClient);
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            RuntimeException exception = assertThrows(RuntimeException.class,
+                    () -> paiementService.creerIntentionPaiement(requeteIntention, "katia@legrandcinema.com"));
+
+            assertEquals("Le délai de paiement est dépassé, veuillez refaire votre réservation", exception.getMessage());
+            stripeMocke.verify(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)), never());
+        }
+    }
+
+    @Test
+    void confirmerPaiement_casNominal_retournePaiementConfirmeEtReserveLesPlaces() {
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
@@ -241,6 +313,12 @@ class PaiementServiceTest {
         }
 
         assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
+        for (Place place : List.of(place1, place2)) {
+            assertEquals(Place.StatutPlace.RESERVEE, place.getStatut());
+            assertNull(place.getFinVerrouillage());
+            assertNull(place.getUtilisateurVerrouillage());
+        }
+        verify(placeRepository, times(2)).save(any(Place.class));
         verify(reservationRepository, times(1)).save(reservation);
         verify(billetService, times(1)).creerBillet(reservation);
         verify(emailService, times(1)).envoyerEmailAvecImage(
@@ -248,12 +326,50 @@ class PaiementServiceTest {
     }
 
     @Test
-    void confirmerPaiement_statutNonReussi_leveExceptionSansBillet() {
+    void confirmerPaiement_carteRefusee_prolongeLeDelaiDeCinqMinutes() {
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
         PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
         when(paymentIntentMock.getStatus()).thenReturn("requires_payment_method");
+        when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
+
+        LocalDateTime avant = LocalDateTime.now();
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            RuntimeException exception = assertThrows(RuntimeException.class,
+                    () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
+
+            assertEquals("Paiement refusé, veuillez réessayer", exception.getMessage());
+        }
+
+        LocalDateTime apres = LocalDateTime.now();
+
+        for (Place place : List.of(place1, place2)) {
+            assertEquals(Place.StatutPlace.VERROUILLEE, place.getStatut());
+            assertEquals(utilisateur, place.getUtilisateurVerrouillage());
+            assertFalse(place.getFinVerrouillage().isBefore(avant.plusMinutes(DELAI_MINUTES)));
+            assertFalse(place.getFinVerrouillage().isAfter(apres.plusMinutes(DELAI_MINUTES)));
+        }
+        assertEquals(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT, reservation.getStatut());
+        verify(placeRepository, times(2)).save(any(Place.class));
+        verify(reservationRepository, never()).save(any());
+        verify(billetService, never()).creerBillet(any());
+        verify(emailService, never()).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void confirmerPaiement_authentificationEnAttente_refuseSansProlongerLeDelai() {
+        LocalDateTime finAvant = place1.getFinVerrouillage();
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("requires_action");
+        when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
@@ -264,10 +380,10 @@ class PaiementServiceTest {
             assertEquals("Le paiement n'a pas été confirmé par Stripe", exception.getMessage());
         }
 
-        assertEquals(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT, reservation.getStatut());
+        assertEquals(finAvant, place1.getFinVerrouillage());
+        verify(placeRepository, never()).save(any());
         verify(reservationRepository, never()).save(any());
         verify(billetService, never()).creerBillet(any());
-        verify(emailService, never()).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -278,6 +394,7 @@ class PaiementServiceTest {
         PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
         when(paymentIntentMock.getStatus()).thenReturn("succeeded");
         when(paymentIntentMock.getAmount()).thenReturn(1000L);
+        when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
@@ -288,6 +405,7 @@ class PaiementServiceTest {
             assertEquals("Le montant payé ne correspond pas au prix de la réservation", exception.getMessage());
         }
 
+        verify(placeRepository, never()).save(any());
         verify(reservationRepository, never()).save(any());
         verify(billetService, never()).creerBillet(any());
     }
@@ -298,17 +416,17 @@ class PaiementServiceTest {
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
         PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
-        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
-        when(paymentIntentMock.getAmount()).thenReturn(2000L);
         when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "99"));
 
-        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
 
             RuntimeException exception = assertThrows(RuntimeException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Ce paiement ne correspond pas à cette réservation", exception.getMessage());
+            remboursementMocke.verify(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)), never());
         }
 
         verify(reservationRepository, never()).save(any());
@@ -351,6 +469,118 @@ class PaiementServiceTest {
         }
 
         verify(billetService, never()).creerBillet(any());
+    }
+
+    @Test
+    void confirmerPaiement_payeApresExpiration_rembourseEtRefuse() {
+        faireExpirerLesPlaces();
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getId()).thenReturn("pi_test_123");
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+        when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+            remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
+                    .thenReturn(mock(Refund.class));
+
+            RuntimeException exception = assertThrows(RuntimeException.class,
+                    () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
+
+            assertEquals("Le délai de paiement est dépassé : votre paiement a été remboursé", exception.getMessage());
+            remboursementMocke.verify(() -> Refund.create(
+                    argThat((RefundCreateParams parametres) -> "pi_test_123".equals(parametres.getPaymentIntent())),
+                    argThat((RequestOptions options) -> "remboursement-pi_test_123".equals(options.getIdempotencyKey()))
+            ));
+        }
+
+        assertEquals(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT, reservation.getStatut());
+        verify(placeRepository, never()).save(any());
+        verify(reservationRepository, never()).save(any());
+        verify(billetService, never()).creerBillet(any());
+    }
+
+    @Test
+    void confirmerPaiement_reservationAnnuleeMaisPayee_rembourseEtRefuse() {
+        reservation.setStatut(Reservation.StatutReservation.ANNULEE);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getId()).thenReturn("pi_test_123");
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+        when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+            remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
+                    .thenReturn(mock(Refund.class));
+
+            RuntimeException exception = assertThrows(RuntimeException.class,
+                    () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
+
+            assertEquals("Le délai de paiement est dépassé : votre paiement a été remboursé", exception.getMessage());
+            remboursementMocke.verify(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)), times(1));
+        }
+
+        verify(billetService, never()).creerBillet(any());
+    }
+
+    @Test
+    void confirmerPaiement_remboursementEchoue_demandeDeContacterLeCinema() {
+        faireExpirerLesPlaces();
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getId()).thenReturn("pi_test_123");
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+        when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+            remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
+                    .thenThrow(new ApiConnectionException("Stripe injoignable"));
+
+            RuntimeException exception = assertThrows(RuntimeException.class,
+                    () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
+
+            assertTrue(exception.getMessage().contains("le remboursement automatique a échoué"));
+            assertTrue(exception.getMessage().contains("contactez le cinéma"));
+        }
+
+        verify(billetService, never()).creerBillet(any());
+    }
+
+    @Test
+    void confirmerPaiement_delaiDepasseEtCarteRefusee_refuseSansRembourserNiProlonger() {
+        faireExpirerLesPlaces();
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("requires_payment_method");
+        when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            RuntimeException exception = assertThrows(RuntimeException.class,
+                    () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
+
+            assertEquals("Le délai de paiement est dépassé, veuillez refaire votre réservation", exception.getMessage());
+            remboursementMocke.verify(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)), never());
+        }
+
+        verify(placeRepository, never()).save(any());
+        verify(reservationRepository, never()).save(any());
     }
 
     @Test
@@ -411,5 +641,129 @@ class PaiementServiceTest {
 
         assertEquals(Reservation.StatutReservation.PAYEE, reservation.getStatut());
         verify(emailService, never()).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void annulerOuRembourserIntention_sansIntention_nAppellePasStripe() {
+        reservation.setPaymentIntentId(null);
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+
+            stripeMocke.verify(() -> PaymentIntent.retrieve(anyString()), never());
+        }
+
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void annulerOuRembourserIntention_paiementReussi_rembourse() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getId()).thenReturn("pi_test_123");
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+            remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
+                    .thenReturn(mock(Refund.class));
+
+            paiementService.annulerOuRembourserIntention(reservation);
+
+            remboursementMocke.verify(() -> Refund.create(
+                    argThat((RefundCreateParams parametres) -> "pi_test_123".equals(parametres.getPaymentIntent())),
+                    argThat((RequestOptions options) -> "remboursement-pi_test_123".equals(options.getIdempotencyKey()))
+            ));
+        }
+
+        verify(paymentIntentMock, never()).cancel();
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void annulerOuRembourserIntention_intentionOuverte_annuleChezStripe() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("requires_payment_method");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            paiementService.annulerOuRembourserIntention(reservation);
+
+            remboursementMocke.verify(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)), never());
+        }
+
+        verify(paymentIntentMock, times(1)).cancel();
+    }
+
+    @Test
+    void annulerOuRembourserIntention_intentionDejaAnnulee_neFaitRien() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("canceled");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            paiementService.annulerOuRembourserIntention(reservation);
+
+            remboursementMocke.verify(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)), never());
+        }
+
+        verify(paymentIntentMock, never()).cancel();
+    }
+
+    @Test
+    void annulerOuRembourserIntention_stripeIllisible_neLevePasDException() {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123"))
+                    .thenThrow(new ApiConnectionException("Stripe injoignable"));
+
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+        }
+    }
+
+    @Test
+    void annulerOuRembourserIntention_remboursementEchoue_neLevePasDException() {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getId()).thenReturn("pi_test_123");
+        when(paymentIntentMock.getStatus()).thenReturn("succeeded");
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
+             MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+            remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
+                    .thenThrow(new ApiConnectionException("Stripe injoignable"));
+
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+        }
+    }
+
+    @Test
+    void annulerOuRembourserIntention_annulationEchoue_neLevePasDException() throws StripeException {
+        reservation.setPaymentIntentId("pi_test_123");
+
+        PaymentIntent paymentIntentMock = mock(PaymentIntent.class);
+        when(paymentIntentMock.getStatus()).thenReturn("requires_payment_method");
+        when(paymentIntentMock.cancel()).thenThrow(new ApiConnectionException("Stripe injoignable"));
+
+        try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
+            stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
+
+            assertDoesNotThrow(() -> paiementService.annulerOuRembourserIntention(reservation));
+        }
+
+        verify(paymentIntentMock, times(1)).cancel();
     }
 }

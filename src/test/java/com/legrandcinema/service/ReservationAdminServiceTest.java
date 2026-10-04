@@ -22,7 +22,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,10 +63,8 @@ class ReservationAdminServiceTest {
         reservation.setPlaces(Arrays.asList(new Place(), new Place()));
         reservation.setStatut(Reservation.StatutReservation.PAYEE);
 
-        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
-                any(LocalDateTime.class),
-                eq(Reservation.StatutReservation.ANNULEE)
-        )).thenReturn(List.of(reservation));
+        when(reservationRepository.findBySeance_DateHeureAfter(any(LocalDateTime.class)))
+                .thenReturn(List.of(reservation));
 
         List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
 
@@ -77,6 +75,29 @@ class ReservationAdminServiceTest {
         assertEquals("Interstellar", resultat.getFilmTitre());
         assertEquals(2, resultat.getNombrePlaces());
         assertEquals("PAYEE", resultat.getStatut());
+    }
+
+    @Test
+    void listerReservations_reservationAnnulee_apparaitAvecSonStatut() {
+        Reservation reservationAnnulee = new Reservation();
+        reservationAnnulee.setId(3L);
+        reservationAnnulee.setUtilisateur(utilisateur);
+        reservationAnnulee.setSeance(seance);
+        reservationAnnulee.setPlaces(Collections.emptyList());
+        reservationAnnulee.setStatut(Reservation.StatutReservation.ANNULEE);
+
+        when(reservationRepository.findBySeance_DateHeureAfter(any(LocalDateTime.class)))
+                .thenReturn(List.of(reservationAnnulee));
+
+        List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
+
+        assertEquals(1, resultats.size());
+        ReservationAdminResponse resultat = resultats.get(0);
+        assertEquals(3L, resultat.getReservationId());
+        assertEquals("Katia Lakhdari", resultat.getClientNom());
+        assertEquals("Interstellar", resultat.getFilmTitre());
+        assertEquals(0, resultat.getNombrePlaces());
+        assertEquals("ANNULEE", resultat.getStatut());
     }
 
     @Test
@@ -99,24 +120,21 @@ class ReservationAdminServiceTest {
         reservation2.setPlaces(Collections.emptyList());
         reservation2.setStatut(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT);
 
-        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
-                any(LocalDateTime.class),
-                eq(Reservation.StatutReservation.ANNULEE)
-        )).thenReturn(Arrays.asList(reservation1, reservation2));
+        when(reservationRepository.findBySeance_DateHeureAfter(any(LocalDateTime.class)))
+                .thenReturn(Arrays.asList(reservation1, reservation2));
 
         List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
 
         assertEquals(2, resultats.size());
         assertEquals(1L, resultats.get(0).getReservationId());
         assertEquals(2L, resultats.get(1).getReservationId());
+        assertEquals("EN_ATTENTE_PAIEMENT", resultats.get(1).getStatut());
     }
 
     @Test
     void listerReservations_aucuneReservation_renvoieListeVide() {
-        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
-                any(LocalDateTime.class),
-                eq(Reservation.StatutReservation.ANNULEE)
-        )).thenReturn(Collections.emptyList());
+        when(reservationRepository.findBySeance_DateHeureAfter(any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
 
         List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
 
@@ -124,18 +142,16 @@ class ReservationAdminServiceTest {
     }
 
     @Test
-    void listerReservations_utiliseLeFiltreEnCours_etJamaisFindAll() {
-        when(reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
-                any(LocalDateTime.class),
-                eq(Reservation.StatutReservation.ANNULEE)
-        )).thenReturn(Collections.emptyList());
+    void listerReservations_filtreSurLesSeancesAVenir_etJamaisFindAll() {
+        when(reservationRepository.findBySeance_DateHeureAfter(any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
 
+        LocalDateTime avant = LocalDateTime.now();
         reservationAdminService.listerReservations();
+        LocalDateTime apres = LocalDateTime.now();
 
-        verify(reservationRepository).findBySeance_DateHeureAfterAndStatutNot(
-                any(LocalDateTime.class),
-                eq(Reservation.StatutReservation.ANNULEE)
-        );
+        verify(reservationRepository).findBySeance_DateHeureAfter(
+                argThat((LocalDateTime date) -> !date.isBefore(avant) && !date.isAfter(apres)));
         verify(reservationRepository, never()).findAll();
     }
 }

@@ -6,6 +6,7 @@ import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,9 @@ public class PlaceService {
 
     @Autowired
     private UtilisateurRepository utilisateurRepository;
+
+    @Value("${reservation.delai-verrouillage-minutes}")
+    private long delaiVerrouillageMinutes;
 
     public List<Place> listerPlacesParSeance(Long seanceId) {
         List<Place> places = placeRepository.findBySeanceId(seanceId);
@@ -45,7 +49,7 @@ public class PlaceService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
         place.setStatut(Place.StatutPlace.VERROUILLEE);
-        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(5));
+        place.setFinVerrouillage(LocalDateTime.now().plusMinutes(delaiVerrouillageMinutes));
         place.setUtilisateurVerrouillage(utilisateur);
         return placeRepository.save(place);
     }
@@ -55,6 +59,10 @@ public class PlaceService {
 
         if (place.getStatut() == Place.StatutPlace.RESERVEE) {
             throw new RuntimeException("Cette place est déjà réservée et payée, impossible de la libérer");
+        }
+
+        if (place.getReservation() != null) {
+            throw new RuntimeException("Cette place fait partie d'une réservation en attente de paiement, impossible de la libérer seule");
         }
 
         libererSiExpiree(place);
@@ -116,8 +124,9 @@ public class PlaceService {
         boolean estVerrouillee = place.getStatut() == Place.StatutPlace.VERROUILLEE;
         boolean estExpiree = place.getFinVerrouillage() != null
                 && place.getFinVerrouillage().isBefore(LocalDateTime.now());
+        boolean sansReservation = place.getReservation() == null;
 
-        if (estVerrouillee && estExpiree) {
+        if (estVerrouillee && estExpiree && sansReservation) {
             place.setStatut(Place.StatutPlace.LIBRE);
             place.setFinVerrouillage(null);
             place.setUtilisateurVerrouillage(null);

@@ -17,10 +17,7 @@ public class ReservationAdminService {
     private final ReservationRepository reservationRepository;
 
     public List<ReservationAdminResponse> listerReservations() {
-        List<Reservation> reservations = reservationRepository.findBySeance_DateHeureAfterAndStatutNot(
-                LocalDateTime.now(),
-                Reservation.StatutReservation.ANNULEE
-        );
+        List<Reservation> reservations = reservationRepository.findBySeance_DateHeureAfter(LocalDateTime.now());
         List<ReservationAdminResponse> resultats = new ArrayList<>();
 
         for (Reservation reservation : reservations) {

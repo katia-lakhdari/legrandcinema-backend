@@ -8,5 +8,5 @@ import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
-    List<Reservation> findBySeance_DateHeureAfterAndStatutNot(LocalDateTime maintenant, Reservation.StatutReservation statut);
+    List<Reservation> findBySeance_DateHeureAfter(LocalDateTime maintenant);
 }

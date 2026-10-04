@@ -39,6 +39,8 @@ public class Reservation {
     @Column(nullable = false)
     private LocalDateTime dateReservation;
 
+    private String paymentIntentId;
+
     public enum StatutReservation {
         EN_ATTENTE_PAIEMENT,
         PAYEE,
