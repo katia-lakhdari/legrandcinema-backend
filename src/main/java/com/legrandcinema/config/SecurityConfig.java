@@ -20,6 +20,8 @@ import java.util.List;
 @Configuration
 public class SecurityConfig {
 
+    private static final String ROLE_ADMIN = "ADMIN";
+
     private final JwtAuthFilter jwtAuthFilter;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
@@ -27,7 +29,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -36,10 +38,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/error").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/films/**", "/api/seances/**", "/api/salles/**").permitAll()
-                        .requestMatchers("/api/films/**", "/api/seances/**", "/api/salles/**").hasRole("ADMIN")
-                        .requestMatchers("/api/places/*/bloquer", "/api/places/*/debloquer").hasRole("ADMIN")
-                        .requestMatchers("/api/billets/scan").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/films/**", "/api/seances/**", "/api/salles/**").hasRole(ROLE_ADMIN)
+                        .requestMatchers("/api/places/*/bloquer", "/api/places/*/debloquer").hasRole(ROLE_ADMIN)
+                        .requestMatchers("/api/billets/scan").hasRole(ROLE_ADMIN)
+                        .requestMatchers("/api/admin/**").hasRole(ROLE_ADMIN)
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
