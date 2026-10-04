@@ -143,10 +143,10 @@ class BilletServiceTest {
     }
 
     @Test
-    void mesBillets_utilisateurInconnu_leveException() {
+    void mesBillets_utilisateurInconnu_leveResourceNotFound() {
         when(utilisateurRepository.findByEmail("inconnu@test.com")).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
                 () -> billetService.mesBillets("inconnu@test.com"));
 
         assertEquals("Utilisateur introuvable", exception.getMessage());
