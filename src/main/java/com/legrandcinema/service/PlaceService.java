@@ -2,10 +2,9 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
-import com.legrandcinema.exception.ResourceNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -15,14 +14,16 @@ import java.util.List;
 @Service
 public class PlaceService {
 
-    @Autowired
-    private PlaceRepository placeRepository;
-
-    @Autowired
-    private UtilisateurRepository utilisateurRepository;
+    private final PlaceRepository placeRepository;
+    private final UtilisateurRepository utilisateurRepository;
 
     @Value("${reservation.delai-verrouillage-minutes}")
     private long delaiVerrouillageMinutes;
+
+    public PlaceService(PlaceRepository placeRepository, UtilisateurRepository utilisateurRepository) {
+        this.placeRepository = placeRepository;
+        this.utilisateurRepository = utilisateurRepository;
+    }
 
     public List<Place> listerPlacesParSeance(Long seanceId) {
         List<Place> places = placeRepository.findBySeanceId(seanceId);
