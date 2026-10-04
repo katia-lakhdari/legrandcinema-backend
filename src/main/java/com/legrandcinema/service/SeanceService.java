@@ -8,10 +8,12 @@ import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SalleRepository;
 import com.legrandcinema.repository.PlaceRepository;
+import com.legrandcinema.repository.ReservationRepository;
 import com.legrandcinema.dto.request.SeanceRequest;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -31,6 +33,9 @@ public class SeanceService {
 
     @Autowired
     private PlaceRepository placeRepository;
+
+    @Autowired
+    private ReservationRepository reservationRepository;
 
     public List<Seance> listerToutesLesSeances() {
         return seanceRepository.findAll();
@@ -120,8 +125,19 @@ public class SeanceService {
         return seanceRepository.save(seance);
     }
 
+    @Transactional
     public void supprimerSeance(Long id) {
         Seance seance = trouverParId(id);
+
+        if (reservationRepository.existsBySeanceId(id)) {
+            throw new RuntimeException("Impossible de supprimer cette séance : elle a des réservations");
+        }
+
+        if (placeRepository.existsBySeanceIdAndStatutNot(id, Place.StatutPlace.LIBRE)) {
+            throw new RuntimeException("Impossible de supprimer cette séance : des places sont en cours de sélection");
+        }
+
+        placeRepository.deleteAll(placeRepository.findBySeanceId(id));
         seanceRepository.delete(seance);
     }
 

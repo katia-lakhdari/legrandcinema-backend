@@ -9,4 +9,6 @@ import java.util.List;
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
     List<Reservation> findBySeance_DateHeureAfter(LocalDateTime maintenant);
+
+    boolean existsBySeanceId(Long seanceId);
 }
