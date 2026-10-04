@@ -54,6 +54,11 @@ public class FilmService {
 
     public void supprimerFilm(Long id) {
         Film film = trouverParId(id);
+
+        if (seanceRepository.existsByFilmId(id)) {
+            throw new RuntimeException("Impossible de supprimer ce film : il a des séances programmées");
+        }
+
         filmRepository.delete(film);
     }
 }
