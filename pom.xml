@@ -29,6 +29,8 @@
 	<properties>
 		<java.version>21</java.version>
 		<argLine></argLine>
+		<sonar.organization>katia-lakhdari</sonar.organization>
+		<sonar.projectKey>katia-lakhdari_legrandcinema-backend</sonar.projectKey>
 	</properties>
 	<dependencies>
 		<dependency>
