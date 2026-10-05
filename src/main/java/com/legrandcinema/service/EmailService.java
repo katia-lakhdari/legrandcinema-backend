@@ -1,5 +1,6 @@
 package com.legrandcinema.service;
 
+import com.legrandcinema.exception.ErreurTechniqueException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class EmailService {
+
+    private static final String ERREUR_ENVOI_EMAIL = "Erreur lors de l'envoi de l'email";
 
     private final JavaMailSender javaMailSender;
     private final String emailExpediteur;
@@ -26,7 +29,7 @@ public class EmailService {
             MimeMessage message = construireMessage(destinataire, sujet, contenu, null, null);
             envoyer(message);
         } catch (MessagingException exception) {
-            throw new RuntimeException("Erreur lors de l'envoi de l'email", exception);
+            throw new ErreurTechniqueException(ERREUR_ENVOI_EMAIL, exception);
         }
     }
 
@@ -36,7 +39,7 @@ public class EmailService {
             MimeMessage message = construireMessage(destinataire, sujet, contenu, image, nomFichier);
             envoyer(message);
         } catch (MessagingException exception) {
-            throw new RuntimeException("Erreur lors de l'envoi de l'email", exception);
+            throw new ErreurTechniqueException(ERREUR_ENVOI_EMAIL, exception);
         }
     }
 
@@ -60,7 +63,7 @@ public class EmailService {
         try {
             javaMailSender.send(message);
         } catch (MailException exception) {
-            throw new RuntimeException("Erreur lors de l'envoi de l'email", exception);
+            throw new ErreurTechniqueException(ERREUR_ENVOI_EMAIL, exception);
         }
     }
 }
