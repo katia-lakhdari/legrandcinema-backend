@@ -2,6 +2,7 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.dto.request.FilmRequest;
 import com.legrandcinema.entity.Film;
+import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SeanceRepository;
@@ -58,7 +59,7 @@ public class FilmService {
         Film film = trouverParId(id);
 
         if (seanceRepository.existsByFilmId(id)) {
-            throw new RuntimeException("Impossible de supprimer ce film : il a des séances programmées");
+            throw new ConflitException("Impossible de supprimer ce film : il a des séances programmées");
         }
 
         filmRepository.delete(film);
