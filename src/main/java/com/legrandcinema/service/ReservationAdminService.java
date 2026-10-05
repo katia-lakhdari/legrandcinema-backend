@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -18,19 +17,16 @@ public class ReservationAdminService {
 
     public List<ReservationAdminResponse> listerReservations() {
         List<Reservation> reservations = reservationRepository.findBySeance_DateHeureAfter(LocalDateTime.now());
-        List<ReservationAdminResponse> resultats = new ArrayList<>();
 
-        for (Reservation reservation : reservations) {
-            resultats.add(new ReservationAdminResponse(
-                    reservation.getId(),
-                    reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom(),
-                    reservation.getSeance().getFilm().getTitre(),
-                    reservation.getSeance().getDateHeure(),
-                    reservation.getPlaces().size(),
-                    reservation.getStatut().name()
-            ));
-        }
-
-        return resultats;
+        return reservations.stream()
+                .map(reservation -> new ReservationAdminResponse(
+                        reservation.getId(),
+                        reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom(),
+                        reservation.getSeance().getFilm().getTitre(),
+                        reservation.getSeance().getDateHeure(),
+                        reservation.getPlaces().size(),
+                        reservation.getStatut().name()
+                ))
+                .toList();
     }
 }
