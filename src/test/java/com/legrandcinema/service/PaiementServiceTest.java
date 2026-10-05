@@ -482,11 +482,13 @@ class PaiementServiceTest {
         when(paymentIntentMock.getStatus()).thenReturn("succeeded");
         when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
 
+        Refund remboursementMock = mock(Refund.class);
+
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
              MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
             remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
-                    .thenReturn(mock(Refund.class));
+                    .thenReturn(remboursementMock);
 
             RuntimeException exception = assertThrows(RuntimeException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
@@ -515,11 +517,13 @@ class PaiementServiceTest {
         when(paymentIntentMock.getStatus()).thenReturn("succeeded");
         when(paymentIntentMock.getMetadata()).thenReturn(Map.of("reservationId", "1"));
 
+        Refund remboursementMock = mock(Refund.class);
+
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
              MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
             remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
-                    .thenReturn(mock(Refund.class));
+                    .thenReturn(remboursementMock);
 
             RuntimeException exception = assertThrows(RuntimeException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
@@ -664,11 +668,13 @@ class PaiementServiceTest {
         when(paymentIntentMock.getId()).thenReturn("pi_test_123");
         when(paymentIntentMock.getStatus()).thenReturn("succeeded");
 
+        Refund remboursementMock = mock(Refund.class);
+
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class);
              MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
             remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
-                    .thenReturn(mock(Refund.class));
+                    .thenReturn(remboursementMock);
 
             paiementService.annulerOuRembourserIntention(reservation);
 
