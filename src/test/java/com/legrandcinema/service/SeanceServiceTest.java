@@ -10,6 +10,8 @@ import com.legrandcinema.repository.SalleRepository;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
 import com.legrandcinema.dto.request.SeanceRequest;
+import com.legrandcinema.exception.ConflitException;
+import com.legrandcinema.exception.RequeteInvalideException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -182,14 +184,14 @@ class SeanceServiceTest {
     }
 
     @Test
-    void creerSeance_pendantUneAutreSeance_leveException() {
+    void creerSeance_pendantUneAutreSeance_leveConflitException() {
         request.setDateHeure(LocalDateTime.of(2026, 12, 15, 19, 0));
 
         when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
         when(salleRepository.findById(1L)).thenReturn(Optional.of(salle));
         when(seanceRepository.trouverSeancesDeLaSalle(1L)).thenReturn(List.of(autreSeance));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> seanceService.creerSeance(request));
 
         assertEquals("La salle est déjà occupée du 15/12/2026 à 18:00 au 15/12/2026 à 20:00", exception.getMessage());
@@ -198,14 +200,14 @@ class SeanceServiceTest {
     }
 
     @Test
-    void creerSeance_finitPendantUneAutreSeance_leveException() {
+    void creerSeance_finitPendantUneAutreSeance_leveConflitException() {
         request.setDateHeure(LocalDateTime.of(2026, 12, 15, 17, 0));
 
         when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
         when(salleRepository.findById(1L)).thenReturn(Optional.of(salle));
         when(seanceRepository.trouverSeancesDeLaSalle(1L)).thenReturn(List.of(autreSeance));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> seanceService.creerSeance(request));
 
         assertEquals("La salle est déjà occupée du 15/12/2026 à 18:00 au 15/12/2026 à 20:00", exception.getMessage());
@@ -262,7 +264,7 @@ class SeanceServiceTest {
     }
 
     @Test
-    void modifierSeance_changementDeSalle_leveException() {
+    void modifierSeance_changementDeSalle_leveRequeteInvalideException() {
         Salle autreSalle = new Salle();
         autreSalle.setId(2L);
         request.setSalleId(2L);
@@ -271,7 +273,7 @@ class SeanceServiceTest {
         when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
         when(salleRepository.findById(2L)).thenReturn(Optional.of(autreSalle));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        RequeteInvalideException exception = assertThrows(RequeteInvalideException.class,
                 () -> seanceService.modifierSeance(1L, request));
 
         assertEquals("Impossible de changer la salle d'une séance : supprimez-la et créez-en une nouvelle", exception.getMessage());
@@ -322,7 +324,7 @@ class SeanceServiceTest {
         when(seanceRepository.findById(1L)).thenReturn(Optional.of(seance));
         when(reservationRepository.existsBySeanceId(1L)).thenReturn(true);
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> seanceService.supprimerSeance(1L));
 
         assertEquals("Impossible de supprimer cette séance : elle a des réservations", exception.getMessage());
@@ -337,7 +339,7 @@ class SeanceServiceTest {
         when(reservationRepository.existsBySeanceId(1L)).thenReturn(false);
         when(placeRepository.existsBySeanceIdAndStatutNot(1L, Place.StatutPlace.LIBRE)).thenReturn(true);
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> seanceService.supprimerSeance(1L));
 
         assertEquals("Impossible de supprimer cette séance : des places sont en cours de sélection", exception.getMessage());

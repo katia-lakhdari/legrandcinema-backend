@@ -5,6 +5,8 @@ import com.legrandcinema.entity.Film;
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Salle;
 import com.legrandcinema.entity.Seance;
+import com.legrandcinema.exception.ConflitException;
+import com.legrandcinema.exception.RequeteInvalideException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.PlaceRepository;
@@ -117,7 +119,7 @@ public class SeanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Salle introuvable"));
 
         if (!seance.getSalle().getId().equals(salle.getId())) {
-            throw new RuntimeException("Impossible de changer la salle d'une séance : supprimez-la et créez-en une nouvelle");
+            throw new RequeteInvalideException("Impossible de changer la salle d'une séance : supprimez-la et créez-en une nouvelle");
         }
 
         verifierSalleLibre(salle, film, request.getDateHeure(), seance.getId());
@@ -133,11 +135,11 @@ public class SeanceService {
         Seance seance = trouverParId(id);
 
         if (reservationRepository.existsBySeanceId(id)) {
-            throw new RuntimeException("Impossible de supprimer cette séance : elle a des réservations");
+            throw new ConflitException("Impossible de supprimer cette séance : elle a des réservations");
         }
 
         if (placeRepository.existsBySeanceIdAndStatutNot(id, Place.StatutPlace.LIBRE)) {
-            throw new RuntimeException("Impossible de supprimer cette séance : des places sont en cours de sélection");
+            throw new ConflitException("Impossible de supprimer cette séance : des places sont en cours de sélection");
         }
 
         placeRepository.deleteAll(placeRepository.findBySeanceId(id));
@@ -159,7 +161,7 @@ public class SeanceService {
             LocalDateTime finAutre = debutAutre.plusMinutes(autreSeance.getFilm().getDuree());
 
             if (debut.isBefore(finAutre) && debutAutre.isBefore(fin)) {
-                throw new RuntimeException("La salle est déjà occupée du "
+                throw new ConflitException("La salle est déjà occupée du "
                         + debutAutre.format(format) + " au " + finAutre.format(format));
             }
         }
