@@ -2,6 +2,8 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.dto.request.SalleRequest;
 import com.legrandcinema.entity.Salle;
+import com.legrandcinema.exception.ConflitException;
+import com.legrandcinema.exception.RequeteInvalideException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.SalleRepository;
 import com.legrandcinema.repository.SeanceRepository;
@@ -49,7 +51,7 @@ public class SalleService {
         Salle salle = trouverParId(id);
 
         if (seanceRepository.existsBySalleId(id)) {
-            throw new RuntimeException("Impossible de supprimer cette salle : elle a des séances programmées");
+            throw new ConflitException("Impossible de supprimer cette salle : elle a des séances programmées");
         }
 
         salleRepository.delete(salle);
@@ -59,7 +61,7 @@ public class SalleService {
         try {
             return Salle.TypeSalle.valueOf(type);
         } catch (IllegalArgumentException exception) {
-            throw new RuntimeException("Type de salle invalide : " + type
+            throw new RequeteInvalideException("Type de salle invalide : " + type
                     + " (valeurs acceptées : PREMIUM_IMAX, STANDARD, VIP, EVENEMENTIELLE)");
         }
     }
