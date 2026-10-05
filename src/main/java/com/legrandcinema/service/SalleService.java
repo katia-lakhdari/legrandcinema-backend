@@ -1,22 +1,24 @@
 package com.legrandcinema.service;
 
+import com.legrandcinema.dto.request.SalleRequest;
 import com.legrandcinema.entity.Salle;
+import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.SalleRepository;
 import com.legrandcinema.repository.SeanceRepository;
-import com.legrandcinema.dto.request.SalleRequest;
-import com.legrandcinema.exception.ResourceNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
 public class SalleService {
 
-    @Autowired
-    private SalleRepository salleRepository;
+    private final SalleRepository salleRepository;
+    private final SeanceRepository seanceRepository;
 
-    @Autowired
-    private SeanceRepository seanceRepository;
+    public SalleService(SalleRepository salleRepository, SeanceRepository seanceRepository) {
+        this.salleRepository = salleRepository;
+        this.seanceRepository = seanceRepository;
+    }
 
     public List<Salle> listerToutesLesSalles() {
         return salleRepository.findAll();

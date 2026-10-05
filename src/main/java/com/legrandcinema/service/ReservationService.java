@@ -1,16 +1,15 @@
 package com.legrandcinema.service;
 
+import com.legrandcinema.dto.request.ReservationRequest;
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
-import com.legrandcinema.dto.request.ReservationRequest;
+import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
 import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
-import com.legrandcinema.exception.ResourceNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,20 +20,23 @@ import java.util.List;
 @Service
 public class ReservationService {
 
-    @Autowired
-    private ReservationRepository reservationRepository;
-
-    @Autowired
-    private SeanceRepository seanceRepository;
-
-    @Autowired
-    private PlaceRepository placeRepository;
-
-    @Autowired
-    private UtilisateurRepository utilisateurRepository;
+    private final ReservationRepository reservationRepository;
+    private final SeanceRepository seanceRepository;
+    private final PlaceRepository placeRepository;
+    private final UtilisateurRepository utilisateurRepository;
 
     @Value("${reservation.delai-verrouillage-minutes}")
     private long delaiVerrouillageMinutes;
+
+    public ReservationService(ReservationRepository reservationRepository,
+                              SeanceRepository seanceRepository,
+                              PlaceRepository placeRepository,
+                              UtilisateurRepository utilisateurRepository) {
+        this.reservationRepository = reservationRepository;
+        this.seanceRepository = seanceRepository;
+        this.placeRepository = placeRepository;
+        this.utilisateurRepository = utilisateurRepository;
+    }
 
     public Reservation creerReservation(ReservationRequest requete, String emailUtilisateur) {
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)

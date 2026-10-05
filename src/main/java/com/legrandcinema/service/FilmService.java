@@ -1,23 +1,25 @@
 package com.legrandcinema.service;
 
+import com.legrandcinema.dto.request.FilmRequest;
 import com.legrandcinema.entity.Film;
+import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SeanceRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 import java.util.List;
-import com.legrandcinema.exception.ResourceNotFoundException;
-import com.legrandcinema.dto.request.FilmRequest;
 
 @Service
 public class FilmService {
 
-    @Autowired
-    private FilmRepository filmRepository;
+    private final FilmRepository filmRepository;
+    private final SeanceRepository seanceRepository;
 
-    @Autowired
-    private SeanceRepository seanceRepository;
+    public FilmService(FilmRepository filmRepository, SeanceRepository seanceRepository) {
+        this.filmRepository = filmRepository;
+        this.seanceRepository = seanceRepository;
+    }
 
     public List<Film> listerTousLesFilms() {
         return filmRepository.findAll();
