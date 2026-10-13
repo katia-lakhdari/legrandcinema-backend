@@ -43,6 +43,9 @@ public class Place {
 
     private String raisonBlocage;
 
+    @Version
+    private long version;
+
     public enum StatutPlace {
         LIBRE, VERROUILLEE, RESERVEE, BLOQUEE
     }
