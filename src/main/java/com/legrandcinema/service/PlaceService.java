@@ -2,10 +2,12 @@ package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -37,17 +39,17 @@ public class PlaceService {
         Place place = trouverParId(id);
 
         if (place.getStatut() == Place.StatutPlace.RESERVEE) {
-            throw new RuntimeException("Cette place est déjà réservée");
+            throw new ConflitException("Cette place est déjà réservée");
         }
 
         libererSiExpiree(place);
 
         if (place.getStatut() == Place.StatutPlace.VERROUILLEE) {
-            throw new RuntimeException("Cette place est déjà en cours de sélection par un autre client");
+            throw new ConflitException("Cette place est déjà en cours de sélection par un autre client");
         }
 
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         place.setStatut(Place.StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(delaiVerrouillageMinutes));
@@ -59,25 +61,25 @@ public class PlaceService {
         Place place = trouverParId(id);
 
         if (place.getStatut() == Place.StatutPlace.RESERVEE) {
-            throw new RuntimeException("Cette place est déjà réservée et payée, impossible de la libérer");
+            throw new ConflitException("Cette place est déjà réservée et payée, impossible de la libérer");
         }
 
         if (place.getReservation() != null) {
-            throw new RuntimeException("Cette place fait partie d'une réservation en attente de paiement, impossible de la libérer seule");
+            throw new ConflitException("Cette place fait partie d'une réservation en attente de paiement, impossible de la libérer seule");
         }
 
         libererSiExpiree(place);
 
         if (place.getStatut() != Place.StatutPlace.VERROUILLEE) {
-            throw new RuntimeException("Cette place n'est pas verrouillée");
+            throw new ConflitException("Cette place n'est pas verrouillée");
         }
 
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         if (place.getUtilisateurVerrouillage() == null
                 || !place.getUtilisateurVerrouillage().getId().equals(utilisateur.getId())) {
-            throw new RuntimeException("Vous n'êtes pas autorisé à libérer cette place");
+            throw new AccessDeniedException("Vous n'êtes pas autorisé à libérer cette place");
         }
 
         place.setStatut(Place.StatutPlace.LIBRE);
@@ -90,13 +92,13 @@ public class PlaceService {
         Place place = trouverParId(id);
 
         if (place.getStatut() == Place.StatutPlace.RESERVEE) {
-            throw new RuntimeException("Impossible de bloquer une place déjà réservée");
+            throw new ConflitException("Impossible de bloquer une place déjà réservée");
         }
 
         libererSiExpiree(place);
 
         if (place.getStatut() == Place.StatutPlace.VERROUILLEE) {
-            throw new RuntimeException("Impossible de bloquer une place en cours de sélection par un client");
+            throw new ConflitException("Impossible de bloquer une place en cours de sélection par un client");
         }
 
         place.setStatut(Place.StatutPlace.BLOQUEE);
@@ -108,7 +110,7 @@ public class PlaceService {
         Place place = trouverParId(id);
 
         if (place.getStatut() != Place.StatutPlace.BLOQUEE) {
-            throw new RuntimeException("Cette place n'est pas bloquée");
+            throw new ConflitException("Cette place n'est pas bloquée");
         }
 
         place.setStatut(Place.StatutPlace.LIBRE);

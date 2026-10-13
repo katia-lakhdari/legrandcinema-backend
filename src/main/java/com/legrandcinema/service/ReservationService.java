@@ -5,6 +5,8 @@ import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ConflitException;
+import com.legrandcinema.exception.RequeteInvalideException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
@@ -40,7 +42,7 @@ public class ReservationService {
 
     public Reservation creerReservation(ReservationRequest requete, String emailUtilisateur) {
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         Seance seance = seanceRepository.findById(requete.getSeanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Séance introuvable"));
@@ -52,20 +54,20 @@ public class ReservationService {
                     .orElseThrow(() -> new ResourceNotFoundException("Place introuvable"));
 
             if (!place.getSeance().getId().equals(seance.getId())) {
-                throw new RuntimeException("Cette place n'appartient pas à la séance demandée");
+                throw new RequeteInvalideException("Cette place n'appartient pas à la séance demandée");
             }
 
             if (place.getStatut() != Place.StatutPlace.VERROUILLEE) {
-                throw new RuntimeException("Cette place n'est pas verrouillée");
+                throw new ConflitException("Cette place n'est pas verrouillée");
             }
 
             if (place.getUtilisateurVerrouillage() == null
                     || !place.getUtilisateurVerrouillage().getId().equals(utilisateur.getId())) {
-                throw new RuntimeException("Cette place est verrouillée par un autre utilisateur");
+                throw new ConflitException("Cette place est verrouillée par un autre utilisateur");
             }
 
             if (place.getFinVerrouillage() == null || place.getFinVerrouillage().isBefore(LocalDateTime.now())) {
-                throw new RuntimeException("Le verrouillage de cette place a expiré");
+                throw new ConflitException("Le verrouillage de cette place a expiré");
             }
 
             places.add(place);

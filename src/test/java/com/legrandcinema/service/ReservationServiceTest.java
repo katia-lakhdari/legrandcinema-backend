@@ -7,6 +7,8 @@ import com.legrandcinema.entity.Reservation.StatutReservation;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.dto.request.ReservationRequest;
+import com.legrandcinema.exception.ConflitException;
+import com.legrandcinema.exception.RequeteInvalideException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
@@ -159,7 +161,7 @@ class ReservationServiceTest {
     }
 
     @Test
-    void creerReservation_placePourAutreSeance_leveException() {
+    void creerReservation_placePourAutreSeance_leveRequeteInvalideException() {
         Seance autreSeance = new Seance();
         autreSeance.setId(20L);
         place.setSeance(autreSeance);
@@ -172,7 +174,7 @@ class ReservationServiceTest {
         when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
         when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        RequeteInvalideException exception = assertThrows(RequeteInvalideException.class,
                 () -> reservationService.creerReservation(requete, EMAIL));
 
         assertEquals("Cette place n'appartient pas à la séance demandée", exception.getMessage());
@@ -180,7 +182,7 @@ class ReservationServiceTest {
     }
 
     @Test
-    void creerReservation_placeNonVerrouillee_leveException() {
+    void creerReservation_placeNonVerrouillee_leveConflitException() {
         place.setStatut(StatutPlace.LIBRE);
 
         ReservationRequest requete = new ReservationRequest();
@@ -191,7 +193,7 @@ class ReservationServiceTest {
         when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
         when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> reservationService.creerReservation(requete, EMAIL));
 
         assertEquals("Cette place n'est pas verrouillée", exception.getMessage());
@@ -199,7 +201,7 @@ class ReservationServiceTest {
     }
 
     @Test
-    void creerReservation_placeVerrouilleeParAutreUtilisateur_leveException() {
+    void creerReservation_placeVerrouilleeParAutreUtilisateur_leveConflitException() {
         Utilisateur autreUtilisateur = new Utilisateur();
         autreUtilisateur.setId(2L);
         place.setUtilisateurVerrouillage(autreUtilisateur);
@@ -212,7 +214,7 @@ class ReservationServiceTest {
         when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
         when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> reservationService.creerReservation(requete, EMAIL));
 
         assertEquals("Cette place est verrouillée par un autre utilisateur", exception.getMessage());
@@ -220,7 +222,7 @@ class ReservationServiceTest {
     }
 
     @Test
-    void creerReservation_verrouillageExpire_leveException() {
+    void creerReservation_verrouillageExpire_leveConflitException() {
         place.setFinVerrouillage(LocalDateTime.now().minusMinutes(1));
 
         ReservationRequest requete = new ReservationRequest();
@@ -231,7 +233,7 @@ class ReservationServiceTest {
         when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
         when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> reservationService.creerReservation(requete, EMAIL));
 
         assertEquals("Le verrouillage de cette place a expiré", exception.getMessage());
@@ -257,7 +259,7 @@ class ReservationServiceTest {
         when(placeRepository.findById(100L)).thenReturn(Optional.of(placeValide));
         when(placeRepository.findById(101L)).thenReturn(Optional.of(placeInvalide));
 
-        assertThrows(RuntimeException.class,
+        assertThrows(ConflitException.class,
                 () -> reservationService.creerReservation(requete, EMAIL));
 
         verify(reservationRepository, never()).save(any());

@@ -3,6 +3,7 @@ package com.legrandcinema.service;
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.BilletRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
@@ -26,7 +27,7 @@ public class BilletService {
 
     public Billet creerBillet(Reservation reservation) {
         if (billetRepository.existsByReservationId(reservation.getId())) {
-            throw new RuntimeException("Un billet existe déjà pour cette réservation");
+            throw new ConflitException("Un billet existe déjà pour cette réservation");
         }
 
         Billet billet = new Billet();
@@ -42,7 +43,7 @@ public class BilletService {
                 .orElseThrow(() -> new ResourceNotFoundException("Billet introuvable"));
 
         if (billet.isScanne()) {
-            throw new RuntimeException("Billet déjà utilisé");
+            throw new ConflitException("Billet déjà utilisé");
         }
 
         billet.setScanne(true);

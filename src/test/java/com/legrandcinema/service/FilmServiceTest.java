@@ -1,6 +1,7 @@
 package com.legrandcinema.service;
 
 import com.legrandcinema.entity.Film;
+import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.FilmRepository;
 import com.legrandcinema.repository.SeanceRepository;
@@ -74,7 +75,7 @@ class FilmServiceTest {
         when(filmRepository.findById(1L)).thenReturn(Optional.of(film));
         when(seanceRepository.existsByFilmId(1L)).thenReturn(true);
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> filmService.supprimerFilm(1L));
 
         assertEquals("Impossible de supprimer ce film : il a des séances programmées", exception.getMessage());

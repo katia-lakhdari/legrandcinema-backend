@@ -3,6 +3,7 @@ package com.legrandcinema.service;
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.BilletRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
@@ -68,10 +69,10 @@ class BilletServiceTest {
     }
 
     @Test
-    void creerBillet_billetDejaExistant_leveException() {
+    void creerBillet_billetDejaExistant_leveConflitException() {
         when(billetRepository.existsByReservationId(1L)).thenReturn(true);
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> billetService.creerBillet(reservation));
 
         assertEquals("Un billet existe déjà pour cette réservation", exception.getMessage());
@@ -101,11 +102,11 @@ class BilletServiceTest {
     }
 
     @Test
-    void scannerBillet_billetDejaScanne_leveException() {
+    void scannerBillet_billetDejaScanne_leveConflitException() {
         billet.setScanne(true);
         when(billetRepository.findByQrCode("qr-code-test-123")).thenReturn(Optional.of(billet));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> billetService.scannerBillet("qr-code-test-123"));
 
         assertEquals("Billet déjà utilisé", exception.getMessage());
