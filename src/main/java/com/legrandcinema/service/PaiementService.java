@@ -8,6 +8,9 @@ import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ConflitException;
+import com.legrandcinema.exception.ErreurTechniqueException;
+import com.legrandcinema.exception.RequeteInvalideException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
@@ -82,7 +85,7 @@ public class PaiementService {
 
             paymentIntent = PaymentIntent.create(parametres, options);
         } catch (StripeException e) {
-            throw new RuntimeException("La préparation du paiement a échoué : " + e.getMessage());
+            throw new ErreurTechniqueException("La préparation du paiement a échoué, veuillez réessayer", e);
         }
 
         reservation.setPaymentIntentId(paymentIntent.getId());
@@ -100,18 +103,18 @@ public class PaiementService {
         Reservation reservation = trouverReservationDuClient(requete.getReservationId(), emailUtilisateur);
 
         if (reservation.getStatut() == Reservation.StatutReservation.PAYEE) {
-            throw new RuntimeException("Cette réservation est déjà payée");
+            throw new ConflitException("Cette réservation est déjà payée");
         }
 
         PaymentIntent paymentIntent;
         try {
             paymentIntent = PaymentIntent.retrieve(requete.getPaymentIntentId());
         } catch (StripeException e) {
-            throw new RuntimeException("Impossible de vérifier le paiement auprès de Stripe : " + e.getMessage());
+            throw new ErreurTechniqueException("Impossible de vérifier le paiement pour le moment, veuillez réessayer", e);
         }
 
         if (!reservation.getId().toString().equals(paymentIntent.getMetadata().get("reservationId"))) {
-            throw new RuntimeException("Ce paiement ne correspond pas à cette réservation");
+            throw new RequeteInvalideException("Ce paiement ne correspond pas à cette réservation");
         }
 
         boolean paiementReussi = STATUT_STRIPE_REUSSI.equals(paymentIntent.getStatus());
@@ -120,25 +123,25 @@ public class PaiementService {
 
         if (reservationExpiree && paiementReussi) {
             rembourser(paymentIntent, reservation);
-            throw new RuntimeException("Le délai de paiement est dépassé : votre paiement a été remboursé");
+            throw new ConflitException("Le délai de paiement est dépassé : votre paiement a été remboursé");
         }
 
         verifierReservationPayable(reservation);
 
         if (STATUT_STRIPE_REFUSE.equals(paymentIntent.getStatus())) {
             prolongerDelai(reservation);
-            throw new RuntimeException("Paiement refusé, veuillez réessayer");
+            throw new RequeteInvalideException("Paiement refusé, veuillez réessayer");
         }
 
         if (!paiementReussi) {
-            throw new RuntimeException("Le paiement n'a pas été confirmé par Stripe");
+            throw new RequeteInvalideException("Le paiement n'a pas été confirmé par Stripe");
         }
 
         BigDecimal montantEnEuros = calculerMontantEnEuros(reservation);
         long montantEnCentimes = montantEnEuros.multiply(BigDecimal.valueOf(100)).longValueExact();
 
         if (!Long.valueOf(montantEnCentimes).equals(paymentIntent.getAmount())) {
-            throw new RuntimeException("Le montant payé ne correspond pas au prix de la réservation");
+            throw new RequeteInvalideException("Le montant payé ne correspond pas au prix de la réservation");
         }
 
         marquerPlacesReservees(reservation);
@@ -214,7 +217,7 @@ public class PaiementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Réservation introuvable"));
 
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         if (!reservation.getUtilisateur().getId().equals(utilisateur.getId())) {
             throw new ResourceNotFoundException("Réservation introuvable");
@@ -225,15 +228,15 @@ public class PaiementService {
 
     private void verifierReservationPayable(Reservation reservation) {
         if (reservation.getStatut() == Reservation.StatutReservation.PAYEE) {
-            throw new RuntimeException("Cette réservation est déjà payée");
+            throw new ConflitException("Cette réservation est déjà payée");
         }
 
         if (reservation.getStatut() == Reservation.StatutReservation.ANNULEE) {
-            throw new RuntimeException("Cette réservation est annulée");
+            throw new ConflitException("Cette réservation est annulée");
         }
 
         if (!delaiEncoreValide(reservation)) {
-            throw new RuntimeException("Le délai de paiement est dépassé, veuillez refaire votre réservation");
+            throw new ConflitException("Le délai de paiement est dépassé, veuillez refaire votre réservation");
         }
     }
 
@@ -277,7 +280,7 @@ public class PaiementService {
         } catch (StripeException e) {
             LOGGER.error("Échec du remboursement du paiement {} pour la réservation {}",
                     paymentIntent.getId(), reservation.getId(), e);
-            throw new RuntimeException(
+            throw new ErreurTechniqueException(
                     "Le délai de paiement est dépassé et le remboursement automatique a échoué : contactez le cinéma");
         }
     }

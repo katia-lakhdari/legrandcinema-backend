@@ -9,6 +9,9 @@ import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
+import com.legrandcinema.exception.ConflitException;
+import com.legrandcinema.exception.ErreurTechniqueException;
+import com.legrandcinema.exception.RequeteInvalideException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.ReservationRepository;
@@ -169,22 +172,21 @@ class PaiementServiceTest {
     }
 
     @Test
-    void creerIntentionPaiement_stripeLeveException_leveExceptionMetier() {
+    void creerIntentionPaiement_stripeLeveException_leveErreurTechniqueException() {
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
         StripeException stripeException = mock(StripeException.class);
-        when(stripeException.getMessage()).thenReturn("Clé API invalide");
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class), any(RequestOptions.class)))
                     .thenThrow(stripeException);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ErreurTechniqueException exception = assertThrows(ErreurTechniqueException.class,
                     () -> paiementService.creerIntentionPaiement(requeteIntention, "katia@legrandcinema.com"));
 
-            assertTrue(exception.getMessage().contains("La préparation du paiement a échoué"));
-            assertTrue(exception.getMessage().contains("Clé API invalide"));
+            assertEquals("La préparation du paiement a échoué, veuillez réessayer", exception.getMessage());
+            assertSame(stripeException, exception.getCause());
         }
 
         verify(reservationRepository, never()).save(any());
@@ -201,11 +203,11 @@ class PaiementServiceTest {
     }
 
     @Test
-    void creerIntentionPaiement_utilisateurIntrouvable_leveException() {
+    void creerIntentionPaiement_utilisateurIntrouvable_leveResourceNotFoundException() {
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("inconnu@mail.com")).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
                 () -> paiementService.creerIntentionPaiement(requeteIntention, "inconnu@mail.com"));
 
         assertEquals("Utilisateur introuvable", exception.getMessage());
@@ -227,24 +229,24 @@ class PaiementServiceTest {
     }
 
     @Test
-    void creerIntentionPaiement_reservationDejaPayee_leveException() {
+    void creerIntentionPaiement_reservationDejaPayee_leveConflitException() {
         reservation.setStatut(Reservation.StatutReservation.PAYEE);
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> paiementService.creerIntentionPaiement(requeteIntention, "katia@legrandcinema.com"));
 
         assertEquals("Cette réservation est déjà payée", exception.getMessage());
     }
 
     @Test
-    void creerIntentionPaiement_reservationAnnulee_leveException() {
+    void creerIntentionPaiement_reservationAnnulee_leveConflitException() {
         reservation.setStatut(Reservation.StatutReservation.ANNULEE);
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> paiementService.creerIntentionPaiement(requeteIntention, "katia@legrandcinema.com"));
 
         assertEquals("Cette réservation est annulée", exception.getMessage());
@@ -257,7 +259,7 @@ class PaiementServiceTest {
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ConflitException exception = assertThrows(ConflitException.class,
                     () -> paiementService.creerIntentionPaiement(requeteIntention, "katia@legrandcinema.com"));
 
             assertEquals("Le délai de paiement est dépassé, veuillez refaire votre réservation", exception.getMessage());
@@ -277,7 +279,7 @@ class PaiementServiceTest {
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ConflitException exception = assertThrows(ConflitException.class,
                     () -> paiementService.creerIntentionPaiement(requeteIntention, "katia@legrandcinema.com"));
 
             assertEquals("Le délai de paiement est dépassé, veuillez refaire votre réservation", exception.getMessage());
@@ -339,7 +341,7 @@ class PaiementServiceTest {
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            RequeteInvalideException exception = assertThrows(RequeteInvalideException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Paiement refusé, veuillez réessayer", exception.getMessage());
@@ -374,7 +376,7 @@ class PaiementServiceTest {
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            RequeteInvalideException exception = assertThrows(RequeteInvalideException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Le paiement n'a pas été confirmé par Stripe", exception.getMessage());
@@ -399,7 +401,7 @@ class PaiementServiceTest {
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            RequeteInvalideException exception = assertThrows(RequeteInvalideException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Le montant payé ne correspond pas au prix de la réservation", exception.getMessage());
@@ -422,7 +424,7 @@ class PaiementServiceTest {
              MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            RequeteInvalideException exception = assertThrows(RequeteInvalideException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Ce paiement ne correspond pas à cette réservation", exception.getMessage());
@@ -434,21 +436,20 @@ class PaiementServiceTest {
     }
 
     @Test
-    void confirmerPaiement_stripeInjoignable_leveExceptionMetier() {
+    void confirmerPaiement_stripeInjoignable_leveErreurTechniqueException() {
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
         StripeException stripeException = mock(StripeException.class);
-        when(stripeException.getMessage()).thenReturn("Délai dépassé");
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenThrow(stripeException);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ErreurTechniqueException exception = assertThrows(ErreurTechniqueException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
-            assertTrue(exception.getMessage().contains("Impossible de vérifier le paiement"));
-            assertTrue(exception.getMessage().contains("Délai dépassé"));
+            assertEquals("Impossible de vérifier le paiement pour le moment, veuillez réessayer", exception.getMessage());
+            assertSame(stripeException, exception.getCause());
         }
 
         verify(billetService, never()).creerBillet(any());
@@ -461,7 +462,7 @@ class PaiementServiceTest {
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ConflitException exception = assertThrows(ConflitException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Cette réservation est déjà payée", exception.getMessage());
@@ -490,7 +491,7 @@ class PaiementServiceTest {
             remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
                     .thenReturn(remboursementMock);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ConflitException exception = assertThrows(ConflitException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Le délai de paiement est dépassé : votre paiement a été remboursé", exception.getMessage());
@@ -525,7 +526,7 @@ class PaiementServiceTest {
             remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
                     .thenReturn(remboursementMock);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ConflitException exception = assertThrows(ConflitException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Le délai de paiement est dépassé : votre paiement a été remboursé", exception.getMessage());
@@ -552,7 +553,7 @@ class PaiementServiceTest {
             remboursementMocke.when(() -> Refund.create(any(RefundCreateParams.class), any(RequestOptions.class)))
                     .thenThrow(new ApiConnectionException("Stripe injoignable"));
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ErreurTechniqueException exception = assertThrows(ErreurTechniqueException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertTrue(exception.getMessage().contains("le remboursement automatique a échoué"));
@@ -576,7 +577,7 @@ class PaiementServiceTest {
              MockedStatic<Refund> remboursementMocke = mockStatic(Refund.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
 
-            RuntimeException exception = assertThrows(RuntimeException.class,
+            ConflitException exception = assertThrows(ConflitException.class,
                     () -> paiementService.confirmerPaiement(requeteConfirmation, "katia@legrandcinema.com"));
 
             assertEquals("Le délai de paiement est dépassé, veuillez refaire votre réservation", exception.getMessage());
@@ -601,7 +602,7 @@ class PaiementServiceTest {
         billetMock.setQrCode("qr-code-test-123");
         when(billetService.creerBillet(reservation)).thenReturn(billetMock);
 
-        doThrow(new RuntimeException("Email indisponible"))
+        doThrow(new ErreurTechniqueException("Email indisponible"))
                 .when(emailService).envoyerEmailAvecImage(anyString(), anyString(), anyString(), any(), anyString());
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
@@ -632,7 +633,7 @@ class PaiementServiceTest {
         when(billetService.creerBillet(reservation)).thenReturn(billetMock);
 
         when(qrCodeService.genererQrCode("qr-code-test-123"))
-                .thenThrow(new RuntimeException("Erreur lors de la génération du QR code"));
+                .thenThrow(new ErreurTechniqueException("Erreur lors de la génération du QR code"));
 
         try (MockedStatic<PaymentIntent> stripeMocke = mockStatic(PaymentIntent.class)) {
             stripeMocke.when(() -> PaymentIntent.retrieve("pi_test_123")).thenReturn(paymentIntentMock);
