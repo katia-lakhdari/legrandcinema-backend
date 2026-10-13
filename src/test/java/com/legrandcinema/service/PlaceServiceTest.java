@@ -6,6 +6,7 @@ import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
+import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -83,11 +85,11 @@ class PlaceServiceTest {
     }
 
     @Test
-    void verrouillerPlace_placeReservee_leveException() {
+    void verrouillerPlace_placeReservee_leveConflitException() {
         place.setStatut(StatutPlace.RESERVEE);
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place est déjà réservée", exception.getMessage());
@@ -95,12 +97,12 @@ class PlaceServiceTest {
     }
 
     @Test
-    void verrouillerPlace_placeVerrouilleeNonExpiree_leveException() {
+    void verrouillerPlace_placeVerrouilleeNonExpiree_leveConflitException() {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(3));
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place est déjà en cours de sélection par un autre client", exception.getMessage());
@@ -133,7 +135,7 @@ class PlaceServiceTest {
         place.setReservation(creerReservationEnAttente());
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place est déjà en cours de sélection par un autre client", exception.getMessage());
@@ -165,14 +167,14 @@ class PlaceServiceTest {
     }
 
     @Test
-    void libererPlace_placeRattacheeAUneReservation_leveException() {
+    void libererPlace_placeRattacheeAUneReservation_leveConflitException() {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
         place.setUtilisateurVerrouillage(utilisateur);
         place.setReservation(creerReservationEnAttente());
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place fait partie d'une réservation en attente de paiement, impossible de la libérer seule",
@@ -182,11 +184,11 @@ class PlaceServiceTest {
     }
 
     @Test
-    void libererPlace_placeReservee_leveException() {
+    void libererPlace_placeReservee_leveConflitException() {
         place.setStatut(StatutPlace.RESERVEE);
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place est déjà réservée et payée, impossible de la libérer", exception.getMessage());
@@ -194,10 +196,10 @@ class PlaceServiceTest {
     }
 
     @Test
-    void libererPlace_placeLibre_leveException() {
+    void libererPlace_placeLibre_leveConflitException() {
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Cette place n'est pas verrouillée", exception.getMessage());
@@ -205,14 +207,14 @@ class PlaceServiceTest {
     }
 
     @Test
-    void libererPlace_placeVerrouilleeParAutreUtilisateur_leveException() {
+    void libererPlace_placeVerrouilleeParAutreUtilisateur_leveAccessDeniedException() {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
         place.setUtilisateurVerrouillage(utilisateur);
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
         when(utilisateurRepository.findByEmail("autre@legrandcinema.com")).thenReturn(Optional.of(autreUtilisateur));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        AccessDeniedException exception = assertThrows(AccessDeniedException.class,
                 () -> placeService.libererPlace(1L, "autre@legrandcinema.com"));
 
         assertEquals("Vous n'êtes pas autorisé à libérer cette place", exception.getMessage());
@@ -220,14 +222,14 @@ class PlaceServiceTest {
     }
 
     @Test
-    void libererPlace_placeVerrouilleeSansUtilisateur_leveException() {
+    void libererPlace_placeVerrouilleeSansUtilisateur_leveAccessDeniedException() {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
         place.setUtilisateurVerrouillage(null);
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
         when(utilisateurRepository.findByEmail("katia@legrandcinema.com")).thenReturn(Optional.of(utilisateur));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        AccessDeniedException exception = assertThrows(AccessDeniedException.class,
                 () -> placeService.libererPlace(1L, "katia@legrandcinema.com"));
 
         assertEquals("Vous n'êtes pas autorisé à libérer cette place", exception.getMessage());
@@ -235,14 +237,14 @@ class PlaceServiceTest {
     }
 
     @Test
-    void libererPlace_utilisateurIntrouvable_leveException() {
+    void libererPlace_utilisateurIntrouvable_leveResourceNotFoundException() {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(2));
         place.setUtilisateurVerrouillage(utilisateur);
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
         when(utilisateurRepository.findByEmail("inconnu@legrandcinema.com")).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class,
+        assertThrows(ResourceNotFoundException.class,
                 () -> placeService.libererPlace(1L, "inconnu@legrandcinema.com"));
 
         verify(placeRepository, never()).save(any());
@@ -287,11 +289,11 @@ class PlaceServiceTest {
     }
 
     @Test
-    void bloquerPlace_placeReservee_leveException() {
+    void bloquerPlace_placeReservee_leveConflitException() {
         place.setStatut(StatutPlace.RESERVEE);
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.bloquerPlace(1L, "Siège défectueux"));
 
         assertEquals("Impossible de bloquer une place déjà réservée", exception.getMessage());
@@ -299,12 +301,12 @@ class PlaceServiceTest {
     }
 
     @Test
-    void bloquerPlace_placeVerrouilleeNonExpiree_leveException() {
+    void bloquerPlace_placeVerrouilleeNonExpiree_leveConflitException() {
         place.setStatut(StatutPlace.VERROUILLEE);
         place.setFinVerrouillage(LocalDateTime.now().plusMinutes(3));
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.bloquerPlace(1L, "Siège défectueux"));
 
         assertEquals("Impossible de bloquer une place en cours de sélection par un client", exception.getMessage());
@@ -346,10 +348,10 @@ class PlaceServiceTest {
     }
 
     @Test
-    void debloquerPlace_placeNonBloquee_leveException() {
+    void debloquerPlace_placeNonBloquee_leveConflitException() {
         when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
 
-        RuntimeException exception = assertThrows(RuntimeException.class,
+        ConflitException exception = assertThrows(ConflitException.class,
                 () -> placeService.debloquerPlace(1L));
 
         assertEquals("Cette place n'est pas bloquée", exception.getMessage());
