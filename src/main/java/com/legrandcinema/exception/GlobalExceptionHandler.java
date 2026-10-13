@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
@@ -42,6 +43,11 @@ public class GlobalExceptionHandler {
         return construireReponse("Identifiant invalide", HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErreurResponse> gererCorpsIllisible(HttpMessageNotReadableException exception) {
+        return construireReponse("Corps de la requête invalide ou mal formé", HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErreurResponse> gererIdentifiantsIncorrects(BadCredentialsException exception) {
         return construireReponse(exception.getMessage(), HttpStatus.UNAUTHORIZED);
@@ -71,11 +77,6 @@ public class GlobalExceptionHandler {
                 erreurs
         );
         return new ResponseEntity<>(reponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErreurResponse> gererErreurMetier(RuntimeException exception) {
-        return construireReponse(exception.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)
