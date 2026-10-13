@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
@@ -31,6 +32,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflitException.class)
     public ResponseEntity<ErreurResponse> gererConflit(ConflitException exception) {
         return construireReponse(exception.getMessage(), HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErreurResponse> gererConflitDeVersion(ObjectOptimisticLockingFailureException exception) {
+        return construireReponse("Cette place vient d'être modifiée par un autre utilisateur, merci de recharger les places et de réessayer", HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(RequeteInvalideException.class)
