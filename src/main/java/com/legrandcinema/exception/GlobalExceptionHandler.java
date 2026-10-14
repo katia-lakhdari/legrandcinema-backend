@@ -4,6 +4,8 @@ import com.legrandcinema.dto.response.ErreurResponse;
 import com.legrandcinema.dto.response.ErreurValidationResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -11,6 +13,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -18,6 +21,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -83,6 +87,22 @@ public class GlobalExceptionHandler {
                 erreurs
         );
         return new ResponseEntity<>(reponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErreurResponse> gererMethodeNonAutorisee(HttpRequestMethodNotSupportedException exception) {
+        String message = "La méthode " + exception.getMethod() + " n'est pas autorisée pour cette route";
+        ErreurResponse erreur = new ErreurResponse(message, HttpStatus.METHOD_NOT_ALLOWED.value());
+
+        HttpHeaders entetes = new HttpHeaders();
+        Set<HttpMethod> methodesAutorisees = exception.getSupportedHttpMethods();
+        if (methodesAutorisees != null) {
+            entetes.setAllow(methodesAutorisees);
+        }
+
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .headers(entetes)
+                .body(erreur);
     }
 
     @ExceptionHandler(Exception.class)
