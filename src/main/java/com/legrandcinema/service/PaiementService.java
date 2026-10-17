@@ -7,6 +7,7 @@ import com.legrandcinema.dto.response.PaiementResponse;
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
+import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ErreurTechniqueException;
@@ -27,7 +28,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -91,11 +94,21 @@ public class PaiementService {
         reservation.setPaymentIntentId(paymentIntent.getId());
         reservationRepository.save(reservation);
 
+        Seance seance = reservation.getSeance();
+        List<String> numerosPlaces = reservation.getPlaces().stream()
+                .map(Place::getNumero)
+                .toList();
+
         return new IntentionPaiementResponse(
                 reservation.getId(),
                 paymentIntent.getId(),
                 paymentIntent.getClientSecret(),
-                montantEnEuros
+                montantEnEuros,
+                seance.getFilm().getTitre(),
+                seance.getFilm().getAffiche(),
+                seance.getDateHeure(),
+                numerosPlaces,
+                calculerSecondesRestantes(reservation)
         );
     }
 
@@ -255,6 +268,16 @@ public class PaiementService {
                         && idClient.equals(place.getUtilisateurVerrouillage().getId())
                         && place.getFinVerrouillage() != null
                         && place.getFinVerrouillage().isAfter(maintenant));
+    }
+
+    private long calculerSecondesRestantes(Reservation reservation) {
+        LocalDateTime finDelai = reservation.getPlaces().stream()
+                .map(Place::getFinVerrouillage)
+                .min(Comparator.naturalOrder())
+                .orElseThrow();
+
+        long secondes = Duration.between(LocalDateTime.now(), finDelai).getSeconds();
+        return Math.max(secondes, 0);
     }
 
     private void prolongerDelai(Reservation reservation) {
