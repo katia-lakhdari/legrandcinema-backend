@@ -5,6 +5,7 @@ import com.legrandcinema.dto.request.PaiementRequest;
 import com.legrandcinema.dto.response.IntentionPaiementResponse;
 import com.legrandcinema.dto.response.PaiementResponse;
 import com.legrandcinema.entity.Billet;
+import com.legrandcinema.entity.Film;
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Seance;
@@ -87,6 +88,11 @@ class PaiementServiceTest {
         seance = new Seance();
         seance.setId(1L);
         seance.setPrix(new BigDecimal("10.00"));
+        Film film = new Film();
+        film.setTitre("Casablanca");
+        film.setAffiche("https://image.tmdb.org/t/p/w500/casablanca.jpg");
+        seance.setFilm(film);
+        seance.setDateHeure(LocalDateTime.of(2026, 11, 7, 20, 30));
 
         place1 = creerPlaceVerrouillee(100L, "A1");
         place2 = creerPlaceVerrouillee(101L, "A2");
@@ -141,6 +147,11 @@ class PaiementServiceTest {
             assertEquals("pi_test_123", resultat.getPaymentIntentId());
             assertEquals("pi_test_123_secret_abc", resultat.getClientSecret());
             assertEquals(new BigDecimal("20.00"), resultat.getMontant());
+            assertEquals("Casablanca", resultat.getTitreFilm());
+            assertEquals("https://image.tmdb.org/t/p/w500/casablanca.jpg", resultat.getAffiche());
+            assertEquals(LocalDateTime.of(2026, 11, 7, 20, 30), resultat.getDateHeureSeance());
+            assertEquals(List.of("A1", "A2"), resultat.getNumerosPlaces());
+            assertTrue(resultat.getSecondesRestantes() > 0 && resultat.getSecondesRestantes() <= 180);
         }
 
         assertEquals("pi_test_123", reservation.getPaymentIntentId());
