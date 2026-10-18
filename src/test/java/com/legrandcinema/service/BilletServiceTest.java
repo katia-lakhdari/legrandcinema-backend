@@ -1,7 +1,12 @@
 package com.legrandcinema.service;
 
+import com.legrandcinema.dto.response.BilletResponse;
 import com.legrandcinema.entity.Billet;
+import com.legrandcinema.entity.Film;
+import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
+import com.legrandcinema.entity.Salle;
+import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.exception.ConflitException;
 import com.legrandcinema.exception.ResourceNotFoundException;
@@ -14,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -114,18 +120,50 @@ class BilletServiceTest {
     }
 
     @Test
-    void mesBillets_utilisateurConnu_renvoieSesBillets() {
+    void mesBillets_utilisateurConnu_renvoieSesBilletsAvecLeNumeroDeReservation() {
         Utilisateur client = new Utilisateur();
         client.setId(5L);
         client.setEmail("client@test.com");
+        client.setPrenom("Marie");
+        client.setNom("Dupont");
+
+        Film film = new Film();
+        film.setTitre("Whiplash");
+
+        Salle salle = new Salle();
+        salle.setNom("Salle 1");
+
+        Seance seance = new Seance();
+        seance.setFilm(film);
+        seance.setSalle(salle);
+        seance.setDateHeure(LocalDateTime.of(2026, 11, 14, 20, 30));
+
+        Place placeA1 = new Place();
+        placeA1.setNumero("A1");
+        Place placeA2 = new Place();
+        placeA2.setNumero("A2");
+
+        reservation.setId(16L);
+        reservation.setUtilisateur(client);
+        reservation.setSeance(seance);
+        reservation.setPlaces(List.of(placeA1, placeA2));
 
         when(utilisateurRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
         when(billetRepository.findByReservationUtilisateurId(5L)).thenReturn(List.of(billet));
 
-        List<Billet> resultat = billetService.mesBillets("client@test.com");
+        List<BilletResponse> resultat = billetService.mesBillets("client@test.com");
 
         assertEquals(1, resultat.size());
-        assertEquals(billet, resultat.get(0));
+        BilletResponse reponse = resultat.get(0);
+        assertEquals(1L, reponse.id());
+        assertEquals(16L, reponse.reservationId());
+        assertEquals("qr-code-test-123", reponse.qrCode());
+        assertFalse(reponse.scanne());
+        assertEquals("Marie Dupont", reponse.nomClient());
+        assertEquals("Whiplash", reponse.titreFilm());
+        assertEquals("2026-11-14T20:30", reponse.dateHeureSeance());
+        assertEquals("Salle 1", reponse.nomSalle());
+        assertEquals(List.of("A1", "A2"), reponse.numerosPlaces());
         verify(billetRepository, times(1)).findByReservationUtilisateurId(5L);
     }
 
@@ -138,7 +176,7 @@ class BilletServiceTest {
         when(utilisateurRepository.findByEmail("client@test.com")).thenReturn(Optional.of(client));
         when(billetRepository.findByReservationUtilisateurId(5L)).thenReturn(List.of());
 
-        List<Billet> resultat = billetService.mesBillets("client@test.com");
+        List<BilletResponse> resultat = billetService.mesBillets("client@test.com");
 
         assertTrue(resultat.isEmpty());
     }
