@@ -1,6 +1,8 @@
 package com.legrandcinema.service;
 
+import com.legrandcinema.dto.response.BilletResponse;
 import com.legrandcinema.entity.Billet;
+import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.exception.ConflitException;
@@ -50,11 +52,13 @@ public class BilletService {
         return billetRepository.save(billet);
     }
 
-    public List<Billet> mesBillets(String emailUtilisateur) {
+    public List<BilletResponse> mesBillets(String emailUtilisateur) {
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        return billetRepository.findByReservationUtilisateurId(utilisateur.getId());
+        return billetRepository.findByReservationUtilisateurId(utilisateur.getId()).stream()
+                .map(this::construireReponse)
+                .toList();
     }
 
     public byte[] obtenirImageQrCode(Long idBillet, String emailUtilisateur) {
@@ -68,5 +72,24 @@ public class BilletService {
         }
 
         return qrCodeService.genererQrCode(billet.getQrCode());
+    }
+
+    private BilletResponse construireReponse(Billet billet) {
+        Reservation reservation = billet.getReservation();
+        List<String> numerosPlaces = reservation.getPlaces().stream()
+                .map(Place::getNumero)
+                .toList();
+
+        return new BilletResponse(
+                billet.getId(),
+                reservation.getId(),
+                billet.getQrCode(),
+                billet.isScanne(),
+                reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom(),
+                reservation.getSeance().getFilm().getTitre(),
+                reservation.getSeance().getDateHeure().toString(),
+                reservation.getSeance().getSalle().getNom(),
+                numerosPlaces
+        );
     }
 }

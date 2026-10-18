@@ -4,7 +4,6 @@ import com.legrandcinema.dto.request.ScanBilletRequest;
 import com.legrandcinema.dto.response.BilletResponse;
 import com.legrandcinema.dto.response.ScanBilletResponse;
 import com.legrandcinema.entity.Billet;
-import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.service.BilletService;
 import jakarta.validation.Valid;
@@ -45,27 +44,7 @@ public class BilletController {
 
     @GetMapping("/mes-billets")
     public List<BilletResponse> mesBillets(Authentication authentication) {
-        List<Billet> billets = billetService.mesBillets(authentication.getName());
-
-        return billets.stream()
-                .map(billet -> {
-                    Reservation reservation = billet.getReservation();
-                    List<String> numerosPlaces = reservation.getPlaces().stream()
-                            .map(Place::getNumero)
-                            .toList();
-
-                    return new BilletResponse(
-                            billet.getId(),
-                            billet.getQrCode(),
-                            billet.isScanne(),
-                            reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom(),
-                            reservation.getSeance().getFilm().getTitre(),
-                            reservation.getSeance().getDateHeure().toString(),
-                            reservation.getSeance().getSalle().getNom(),
-                            numerosPlaces
-                    );
-                })
-                .toList();
+        return billetService.mesBillets(authentication.getName());
     }
 
     @GetMapping("/{id}/qrcode")
