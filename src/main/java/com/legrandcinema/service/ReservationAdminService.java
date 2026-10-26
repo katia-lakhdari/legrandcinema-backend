@@ -21,6 +21,7 @@ public class ReservationAdminService {
         return reservations.stream()
                 .map(reservation -> new ReservationAdminResponse(
                         reservation.getId(),
+                        reservation.getSeance().getId(),
                         reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom(),
                         reservation.getSeance().getFilm().getTitre(),
                         reservation.getSeance().getDateHeure(),

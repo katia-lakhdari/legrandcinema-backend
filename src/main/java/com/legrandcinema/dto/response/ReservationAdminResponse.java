@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 public class ReservationAdminResponse {
 
     private Long reservationId;
+    private Long seanceId;
     private String clientNom;
     private String filmTitre;
     private LocalDateTime dateHeureSeance;
