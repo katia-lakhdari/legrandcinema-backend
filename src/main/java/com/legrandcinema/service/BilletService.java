@@ -11,11 +11,19 @@ import com.legrandcinema.repository.BilletRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class BilletService {
+
+    private static final ZoneId FUSEAU_PARIS = ZoneId.of("Europe/Paris");
+    private static final DateTimeFormatter FORMAT_SEANCE =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy 'à' HH'h'mm");
 
     private final BilletRepository billetRepository;
     private final UtilisateurRepository utilisateurRepository;
@@ -46,6 +54,14 @@ public class BilletService {
 
         if (billet.isScanne()) {
             throw new ConflitException("Billet déjà utilisé");
+        }
+
+        LocalDateTime dateHeureSeance = billet.getReservation().getSeance().getDateHeure();
+        LocalDate aujourdhui = LocalDate.now(FUSEAU_PARIS);
+
+        if (!dateHeureSeance.toLocalDate().equals(aujourdhui)) {
+            throw new ConflitException("Ce billet est pour la séance du "
+                    + dateHeureSeance.format(FORMAT_SEANCE));
         }
 
         billet.setScanne(true);
