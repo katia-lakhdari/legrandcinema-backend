@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 
@@ -37,6 +38,8 @@ import java.util.List;
 public class PaiementService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PaiementService.class);
+
+    private static final ZoneId FUSEAU_PARIS = ZoneId.of("Europe/Paris");
 
     private static final String STATUT_STRIPE_REUSSI = "succeeded";
     private static final String STATUT_STRIPE_REFUSE = "requires_payment_method";
@@ -276,7 +279,9 @@ public class PaiementService {
                 .min(Comparator.naturalOrder())
                 .orElseThrow();
 
-        long secondes = Duration.between(LocalDateTime.now(), finDelai).getSeconds();
+        long secondes = Duration.between(
+                LocalDateTime.now().atZone(FUSEAU_PARIS),
+                finDelai.atZone(FUSEAU_PARIS)).getSeconds();
         return Math.max(secondes, 0);
     }
 
