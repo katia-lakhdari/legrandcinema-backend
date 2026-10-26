@@ -19,7 +19,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,6 +54,10 @@ class BilletServiceTest {
         reservation = new Reservation();
         reservation.setId(1L);
         reservation.setUtilisateur(proprietaire);
+
+        Seance seanceDuJour = new Seance();
+        seanceDuJour.setDateHeure(LocalDate.now(ZoneId.of("Europe/Paris")).atTime(23, 59));
+        reservation.setSeance(seanceDuJour);
 
         billet = new Billet();
         billet.setId(1L);
@@ -116,6 +122,20 @@ class BilletServiceTest {
                 () -> billetService.scannerBillet("qr-code-test-123"));
 
         assertEquals("Billet déjà utilisé", exception.getMessage());
+        verify(billetRepository, never()).save(any(Billet.class));
+    }
+
+    @Test
+    void scannerBillet_seanceUnAutreJour_leveConflitEtNeMarquePasLeBillet() {
+        LocalDate demain = LocalDate.now(ZoneId.of("Europe/Paris")).plusDays(1);
+        reservation.getSeance().setDateHeure(demain.atTime(20, 30));
+        when(billetRepository.findByQrCode("qr-code-test-123")).thenReturn(Optional.of(billet));
+
+        ConflitException exception = assertThrows(ConflitException.class,
+                () -> billetService.scannerBillet("qr-code-test-123"));
+
+        assertTrue(exception.getMessage().startsWith("Ce billet est pour la séance du "));
+        assertFalse(billet.isScanne());
         verify(billetRepository, never()).save(any(Billet.class));
     }
 
