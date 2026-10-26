@@ -132,6 +132,48 @@ class ReservationAdminServiceTest {
     }
 
     @Test
+    void listerReservations_memeFilmMemeHeure_seanceIdDifferent() {
+        Film whiplash = new Film();
+        whiplash.setTitre("Whiplash");
+        LocalDateTime memeHoraire = LocalDateTime.now().plusDays(7).withHour(20).withMinute(30);
+
+        Seance seanceSalle1 = new Seance();
+        seanceSalle1.setId(12L);
+        seanceSalle1.setFilm(whiplash);
+        seanceSalle1.setDateHeure(memeHoraire);
+
+        Seance seanceSalle2 = new Seance();
+        seanceSalle2.setId(13L);
+        seanceSalle2.setFilm(whiplash);
+        seanceSalle2.setDateHeure(memeHoraire);
+
+        Reservation reservationSalle1 = new Reservation();
+        reservationSalle1.setId(1L);
+        reservationSalle1.setUtilisateur(utilisateur);
+        reservationSalle1.setSeance(seanceSalle1);
+        reservationSalle1.setPlaces(List.of(new Place()));
+        reservationSalle1.setStatut(Reservation.StatutReservation.PAYEE);
+
+        Reservation reservationSalle2 = new Reservation();
+        reservationSalle2.setId(2L);
+        reservationSalle2.setUtilisateur(utilisateur);
+        reservationSalle2.setSeance(seanceSalle2);
+        reservationSalle2.setPlaces(List.of(new Place()));
+        reservationSalle2.setStatut(Reservation.StatutReservation.PAYEE);
+
+        when(reservationRepository.findBySeance_DateHeureAfter(any(LocalDateTime.class)))
+                .thenReturn(Arrays.asList(reservationSalle1, reservationSalle2));
+
+        List<ReservationAdminResponse> resultats = reservationAdminService.listerReservations();
+
+        assertEquals(2, resultats.size());
+        assertEquals(resultats.get(0).getFilmTitre(), resultats.get(1).getFilmTitre());
+        assertEquals(resultats.get(0).getDateHeureSeance(), resultats.get(1).getDateHeureSeance());
+        assertEquals(12L, resultats.get(0).getSeanceId());
+        assertEquals(13L, resultats.get(1).getSeanceId());
+    }
+
+    @Test
     void listerReservations_aucuneReservation_renvoieListeVide() {
         when(reservationRepository.findBySeance_DateHeureAfter(any(LocalDateTime.class)))
                 .thenReturn(Collections.emptyList());
