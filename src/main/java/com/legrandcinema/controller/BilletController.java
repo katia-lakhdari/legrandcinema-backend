@@ -6,6 +6,8 @@ import com.legrandcinema.dto.response.ScanBilletResponse;
 import com.legrandcinema.entity.Billet;
 import com.legrandcinema.entity.Reservation;
 import com.legrandcinema.service.BilletService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/billets")
+@Tag(name = "Billets", description = "Billets, QR code et scan à l'entrée")
 public class BilletController {
 
     private final BilletService billetService;
@@ -29,6 +32,7 @@ public class BilletController {
         this.billetService = billetService;
     }
 
+    @Operation(summary = "Scanner un billet à l'entrée de la salle (admin)")
     @PostMapping("/scan")
     public ScanBilletResponse scannerBillet(@Valid @RequestBody ScanBilletRequest requete) {
         Billet billet = billetService.scannerBillet(requete.getQrCode());
@@ -42,11 +46,13 @@ public class BilletController {
         );
     }
 
+    @Operation(summary = "Lister les billets du client connecté")
     @GetMapping("/mes-billets")
     public List<BilletResponse> mesBillets(Authentication authentication) {
         return billetService.mesBillets(authentication.getName());
     }
 
+    @Operation(summary = "Afficher l'image QR code d'un billet")
     @GetMapping("/{id}/qrcode")
     public ResponseEntity<byte[]> obtenirQrCode(@PathVariable Long id, Authentication authentication) {
         byte[] image = billetService.obtenirImageQrCode(id, authentication.getName());
