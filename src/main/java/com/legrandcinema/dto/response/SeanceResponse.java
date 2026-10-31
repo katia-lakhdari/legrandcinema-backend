@@ -8,15 +8,15 @@ import java.time.LocalDateTime;
 @Getter
 public class SeanceResponse {
 
-    private Long id;
-    private Long filmId;
-    private String titreFilm;
-    private Long salleId;
-    private String nomSalle;
-    private LocalDateTime dateHeure;
-    private BigDecimal prix;
-    private long placesLibres;
-    private boolean complete;
+    private final Long id;
+    private final Long filmId;
+    private final String titreFilm;
+    private final Long salleId;
+    private final String nomSalle;
+    private final LocalDateTime dateHeure;
+    private final BigDecimal prix;
+    private final long placesLibres;
+    private final boolean complete;
 
     public SeanceResponse(Seance seance, long placesLibres) {
         this.id = seance.getId();
