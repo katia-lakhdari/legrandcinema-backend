@@ -86,7 +86,7 @@ public class PaiementService {
                     .build();
 
             RequestOptions options = RequestOptions.builder()
-                    .setIdempotencyKey("intention-reservation-" + reservation.getId())
+                    .setIdempotencyKey("intention-reservation-" + reservation.getId() + "-" + reservation.getDateReservation())
                     .build();
 
             paymentIntent = PaymentIntent.create(parametres, options);
