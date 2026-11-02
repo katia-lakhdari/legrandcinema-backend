@@ -14,9 +14,11 @@ import com.legrandcinema.repository.SeanceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 @Service
@@ -40,6 +42,7 @@ public class ReservationService {
         this.utilisateurRepository = utilisateurRepository;
     }
 
+    @Transactional
     public Reservation creerReservation(ReservationRequest requete, String emailUtilisateur) {
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
@@ -47,9 +50,13 @@ public class ReservationService {
         Seance seance = seanceRepository.findById(requete.getSeanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Séance introuvable"));
 
+        if (seance.getDateHeure().isBefore(LocalDateTime.now())) {
+            throw new ConflitException("Cette séance a déjà commencé, il n'est plus possible de réserver");
+        }
+
         List<Place> places = new ArrayList<>();
 
-        for (Long placeId : requete.getPlaceIds()) {
+        for (Long placeId : new LinkedHashSet<>(requete.getPlaceIds())) {
             Place place = placeRepository.findById(placeId)
                     .orElseThrow(() -> new ResourceNotFoundException("Place introuvable"));
 
@@ -68,6 +75,10 @@ public class ReservationService {
 
             if (place.getFinVerrouillage() == null || place.getFinVerrouillage().isBefore(LocalDateTime.now())) {
                 throw new ConflitException("Le verrouillage de cette place a expiré");
+            }
+
+            if (place.getReservation() != null) {
+                throw new ConflitException("Cette place fait déjà partie d'une réservation en attente de paiement");
             }
 
             places.add(place);
