@@ -63,6 +63,7 @@ class ReservationServiceTest {
 
         seance = new Seance();
         seance.setId(10L);
+        seance.setDateHeure(LocalDateTime.now().plusDays(1));
 
         place = new Place();
         place.setId(100L);
@@ -264,5 +265,67 @@ class ReservationServiceTest {
 
         verify(reservationRepository, never()).save(any());
         verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void creerReservation_memePlaceDemandeeDeuxFois_neLaCompteQuUneFois() {
+        ReservationRequest requete = new ReservationRequest();
+        requete.setSeanceId(10L);
+        requete.setPlaceIds(List.of(100L, 100L));
+
+        when(utilisateurRepository.findByEmail(EMAIL)).thenReturn(Optional.of(utilisateur));
+        when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
+        when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(i -> i.getArgument(0));
+        when(placeRepository.save(any(Place.class))).thenAnswer(i -> i.getArgument(0));
+
+        Reservation resultat = reservationService.creerReservation(requete, EMAIL);
+
+        assertEquals(1, resultat.getPlaces().size());
+        verify(placeRepository, times(1)).findById(100L);
+        verify(placeRepository, times(1)).save(place);
+    }
+
+    @Test
+    void creerReservation_placeDejaDansUneReservation_leveConflitException() {
+        Reservation premiereReservation = new Reservation();
+        premiereReservation.setId(50L);
+        premiereReservation.setStatut(StatutReservation.EN_ATTENTE_PAIEMENT);
+        place.setReservation(premiereReservation);
+
+        ReservationRequest requete = new ReservationRequest();
+        requete.setSeanceId(10L);
+        requete.setPlaceIds(List.of(100L));
+
+        when(utilisateurRepository.findByEmail(EMAIL)).thenReturn(Optional.of(utilisateur));
+        when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
+        when(placeRepository.findById(100L)).thenReturn(Optional.of(place));
+
+        ConflitException exception = assertThrows(ConflitException.class,
+                () -> reservationService.creerReservation(requete, EMAIL));
+
+        assertEquals("Cette place fait déjà partie d'une réservation en attente de paiement", exception.getMessage());
+        assertEquals(premiereReservation, place.getReservation());
+        verify(reservationRepository, never()).save(any());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void creerReservation_seanceDejaCommencee_leveConflitException() {
+        seance.setDateHeure(LocalDateTime.now().minusMinutes(10));
+
+        ReservationRequest requete = new ReservationRequest();
+        requete.setSeanceId(10L);
+        requete.setPlaceIds(List.of(100L));
+
+        when(utilisateurRepository.findByEmail(EMAIL)).thenReturn(Optional.of(utilisateur));
+        when(seanceRepository.findById(10L)).thenReturn(Optional.of(seance));
+
+        ConflitException exception = assertThrows(ConflitException.class,
+                () -> reservationService.creerReservation(requete, EMAIL));
+
+        assertEquals("Cette séance a déjà commencé, il n'est plus possible de réserver", exception.getMessage());
+        verify(placeRepository, never()).findById(any());
+        verify(reservationRepository, never()).save(any());
     }
 }

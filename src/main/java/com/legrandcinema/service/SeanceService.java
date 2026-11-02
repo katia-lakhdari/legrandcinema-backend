@@ -62,6 +62,7 @@ public class SeanceService {
         return placeRepository.countBySeanceIdAndStatut(seanceId, Place.StatutPlace.LIBRE);
     }
 
+    @Transactional
     public Seance creerSeance(SeanceRequest request) {
         Film film = filmRepository.findById(request.getFilmId())
                 .orElseThrow(() -> new ResourceNotFoundException("Film introuvable"));
