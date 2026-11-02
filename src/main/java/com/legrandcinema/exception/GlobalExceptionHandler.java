@@ -4,6 +4,7 @@ import com.legrandcinema.dto.response.ErreurResponse;
 import com.legrandcinema.dto.response.ErreurValidationResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -13,11 +14,14 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -103,6 +107,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .headers(entetes)
                 .body(erreur);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErreurResponse> gererRouteInconnue(NoResourceFoundException exception) {
+        return construireReponse("Cette adresse n'existe pas", HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErreurResponse> gererFormatNonAccepte(HttpMediaTypeNotSupportedException exception) {
+        return construireReponse("Format de la requête non accepté : envoyez du JSON", HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErreurResponse> gererParametreManquant(MissingServletRequestParameterException exception) {
+        return construireReponse("Le paramètre " + exception.getParameterName() + " est obligatoire", HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErreurResponse> gererDonneesEnConflit(DataIntegrityViolationException exception) {
+        LOGGER.warn("Contrainte de la base de données non respectée : {}", exception.getMessage());
+        return construireReponse("Cette opération entre en conflit avec des données existantes", HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(Exception.class)
