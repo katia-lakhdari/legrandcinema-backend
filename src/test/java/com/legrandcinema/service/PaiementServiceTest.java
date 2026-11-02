@@ -103,6 +103,7 @@ class PaiementServiceTest {
         reservation.setSeance(seance);
         reservation.setPlaces(List.of(place1, place2));
         reservation.setStatut(Reservation.StatutReservation.EN_ATTENTE_PAIEMENT);
+        reservation.setDateReservation(LocalDateTime.of(2026, 11, 2, 18, 0));
 
         requeteIntention = new PaiementRequest();
         requeteIntention.setReservationId(1L);
@@ -177,7 +178,7 @@ class PaiementServiceTest {
                     argThat((PaymentIntentCreateParams parametres) ->
                             Long.valueOf(2000L).equals(parametres.getAmount())
                                     && "1".equals(parametres.getMetadata().get("reservationId"))),
-                    argThat((RequestOptions options) -> "intention-reservation-1".equals(options.getIdempotencyKey()))
+                    argThat((RequestOptions options) -> "intention-reservation-1-2026-11-02T18:00".equals(options.getIdempotencyKey()))
             ));
         }
     }
