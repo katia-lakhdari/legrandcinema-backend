@@ -3,6 +3,7 @@ package com.legrandcinema.service;
 import com.legrandcinema.entity.Place;
 import com.legrandcinema.entity.Place.StatutPlace;
 import com.legrandcinema.entity.Reservation;
+import com.legrandcinema.entity.Seance;
 import com.legrandcinema.entity.Utilisateur;
 import com.legrandcinema.repository.PlaceRepository;
 import com.legrandcinema.repository.UtilisateurRepository;
@@ -38,6 +39,7 @@ class PlaceServiceTest {
     @InjectMocks
     private PlaceService placeService;
 
+    private Seance seance;
     private Place place;
     private Utilisateur utilisateur;
     private Utilisateur autreUtilisateur;
@@ -46,8 +48,13 @@ class PlaceServiceTest {
     void initialisation() {
         ReflectionTestUtils.setField(placeService, "delaiVerrouillageMinutes", DELAI_MINUTES);
 
+        seance = new Seance();
+        seance.setId(10L);
+        seance.setDateHeure(LocalDateTime.now().plusDays(1));
+
         place = new Place();
         place.setId(1L);
+        place.setSeance(seance);
         place.setNumero("A12");
         place.setStatut(StatutPlace.LIBRE);
 
@@ -148,6 +155,33 @@ class PlaceServiceTest {
 
         assertThrows(ResourceNotFoundException.class,
                 () -> placeService.verrouillerPlace(99L, "katia@legrandcinema.com"));
+    }
+
+    @Test
+    void verrouillerPlace_placeBloquee_leveConflitException() {
+        place.setStatut(StatutPlace.BLOQUEE);
+        place.setRaisonBlocage("Fauteuil cassé");
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        ConflitException exception = assertThrows(ConflitException.class,
+                () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
+
+        assertEquals("Cette place n'est pas disponible", exception.getMessage());
+        assertEquals(StatutPlace.BLOQUEE, place.getStatut());
+        verify(placeRepository, never()).save(any());
+    }
+
+    @Test
+    void verrouillerPlace_seanceDejaCommencee_leveConflitException() {
+        seance.setDateHeure(LocalDateTime.now().minusMinutes(10));
+        when(placeRepository.findById(1L)).thenReturn(Optional.of(place));
+
+        ConflitException exception = assertThrows(ConflitException.class,
+                () -> placeService.verrouillerPlace(1L, "katia@legrandcinema.com"));
+
+        assertEquals("Cette séance a déjà commencé, il n'est plus possible de réserver", exception.getMessage());
+        assertEquals(StatutPlace.LIBRE, place.getStatut());
+        verify(placeRepository, never()).save(any());
     }
 
     @Test

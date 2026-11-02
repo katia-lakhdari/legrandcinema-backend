@@ -38,14 +38,14 @@ public class PlaceService {
     public Place verrouillerPlace(Long id, String emailUtilisateur) {
         Place place = trouverParId(id);
 
-        if (place.getStatut() == Place.StatutPlace.RESERVEE) {
-            throw new ConflitException("Cette place est déjà réservée");
+        if (place.getSeance().getDateHeure().isBefore(LocalDateTime.now())) {
+            throw new ConflitException("Cette séance a déjà commencé, il n'est plus possible de réserver");
         }
 
         libererSiExpiree(place);
 
-        if (place.getStatut() == Place.StatutPlace.VERROUILLEE) {
-            throw new ConflitException("Cette place est déjà en cours de sélection par un autre client");
+        if (place.getStatut() != Place.StatutPlace.LIBRE) {
+            throw new ConflitException(messagePlaceIndisponible(place.getStatut()));
         }
 
         Utilisateur utilisateur = utilisateurRepository.findByEmail(emailUtilisateur)
@@ -116,6 +116,16 @@ public class PlaceService {
         place.setStatut(Place.StatutPlace.LIBRE);
         place.setRaisonBlocage(null);
         return placeRepository.save(place);
+    }
+
+    private String messagePlaceIndisponible(Place.StatutPlace statut) {
+        if (statut == Place.StatutPlace.RESERVEE) {
+            return "Cette place est déjà réservée";
+        }
+        if (statut == Place.StatutPlace.VERROUILLEE) {
+            return "Cette place est déjà en cours de sélection par un autre client";
+        }
+        return "Cette place n'est pas disponible";
     }
 
     private Place trouverParId(Long id) {
