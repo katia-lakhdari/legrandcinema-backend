@@ -7,6 +7,7 @@ import com.legrandcinema.service.SalleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class SalleController {
 
     @Operation(summary = "Ajouter une salle (admin)")
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     public SalleResponse creerSalle(@Valid @RequestBody SalleRequest request) {
         Salle salle = salleService.creerSalle(request);
         return new SalleResponse(salle);
@@ -53,6 +55,7 @@ public class SalleController {
 
     @Operation(summary = "Supprimer une salle (admin)")
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void supprimerSalle(@PathVariable Long id) {
         salleService.supprimerSalle(id);
     }

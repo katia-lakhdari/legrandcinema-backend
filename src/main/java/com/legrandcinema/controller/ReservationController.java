@@ -8,6 +8,7 @@ import com.legrandcinema.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +27,7 @@ public class ReservationController {
 
     @Operation(summary = "Réserver les places choisies pour une séance")
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     public ReservationResponse creerReservation(@Valid @RequestBody ReservationRequest requete, Authentication authentication) {
         Reservation reservation = reservationService.creerReservation(requete, authentication.getName());
 

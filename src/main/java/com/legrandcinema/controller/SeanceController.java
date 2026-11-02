@@ -7,6 +7,7 @@ import com.legrandcinema.service.SeanceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,6 +40,7 @@ public class SeanceController {
 
     @Operation(summary = "Programmer une séance (admin)")
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     public SeanceResponse creerSeance(@Valid @RequestBody SeanceRequest request) {
         Seance seance = seanceService.creerSeance(request);
         return construireReponse(seance);
@@ -53,6 +55,7 @@ public class SeanceController {
 
     @Operation(summary = "Supprimer une séance (admin)")
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void supprimerSeance(@PathVariable Long id) {
         seanceService.supprimerSeance(id);
     }
