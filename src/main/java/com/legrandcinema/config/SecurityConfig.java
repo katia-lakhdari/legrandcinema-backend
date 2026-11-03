@@ -42,6 +42,7 @@ public class SecurityConfig {
                                 "/api/auth/mot-de-passe-oublie", "/api/auth/reinitialiser-mot-de-passe",
                                 "/error").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/films/**", "/api/seances/**", "/api/salles/**").permitAll()
                         .requestMatchers("/api/films/**", "/api/seances/**", "/api/salles/**").hasRole(ROLE_ADMIN)
                         .requestMatchers("/api/places/*/bloquer", "/api/places/*/debloquer").hasRole(ROLE_ADMIN)
