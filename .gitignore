@@ -35,3 +35,6 @@ build/
 ### Application ###
 application-secrets.properties
 *.env
+
+### SonarQube for IDE ###
+.sonar/
