@@ -114,6 +114,11 @@ public class SeanceService {
 
     public Seance modifierSeance(Long id, SeanceRequest request) {
         Seance seance = trouverParId(id);
+
+        if (reservationRepository.existsBySeanceId(id)) {
+            throw new ConflitException("Impossible de modifier cette séance : elle a des réservations");
+        }
+
         Film film = filmRepository.findById(request.getFilmId())
                 .orElseThrow(() -> new ResourceNotFoundException("Film introuvable"));
         Salle salle = salleRepository.findById(request.getSalleId())
