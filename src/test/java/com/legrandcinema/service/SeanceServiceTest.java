@@ -264,6 +264,20 @@ class SeanceServiceTest {
     }
 
     @Test
+    void modifierSeance_seanceAvecReservations_leveConflitException() {
+        request.setPrix(new BigDecimal("12.00"));
+
+        when(seanceRepository.findById(1L)).thenReturn(Optional.of(seance));
+        when(reservationRepository.existsBySeanceId(1L)).thenReturn(true);
+
+        ConflitException exception = assertThrows(ConflitException.class,
+                () -> seanceService.modifierSeance(1L, request));
+
+        assertEquals("Impossible de modifier cette séance : elle a des réservations", exception.getMessage());
+        verify(seanceRepository, never()).save(any());
+    }
+
+    @Test
     void modifierSeance_changementDeSalle_leveRequeteInvalideException() {
         Salle autreSalle = new Salle();
         autreSalle.setId(2L);
