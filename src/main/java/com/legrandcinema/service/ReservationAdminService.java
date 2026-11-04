@@ -1,0 +1,33 @@
+package com.legrandcinema.service;
+
+import com.legrandcinema.dto.response.ReservationAdminResponse;
+import com.legrandcinema.entity.Reservation;
+import com.legrandcinema.repository.ReservationRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class ReservationAdminService {
+
+    private final ReservationRepository reservationRepository;
+
+    public List<ReservationAdminResponse> listerReservations() {
+        List<Reservation> reservations = reservationRepository.findBySeance_DateHeureAfter(LocalDateTime.now());
+
+        return reservations.stream()
+                .map(reservation -> new ReservationAdminResponse(
+                        reservation.getId(),
+                        reservation.getSeance().getId(),
+                        reservation.getUtilisateur().getPrenom() + " " + reservation.getUtilisateur().getNom(),
+                        reservation.getSeance().getFilm().getTitre(),
+                        reservation.getSeance().getDateHeure(),
+                        reservation.getPlaces().size(),
+                        reservation.getStatut().name()
+                ))
+                .toList();
+    }
+}
