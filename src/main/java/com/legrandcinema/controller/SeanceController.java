@@ -5,6 +5,7 @@ import com.legrandcinema.dto.response.SeanceResponse;
 import com.legrandcinema.entity.Seance;
 import com.legrandcinema.service.SeanceService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ public class SeanceController {
     }
 
     @Operation(summary = "Lister toutes les séances")
+    @SecurityRequirements
     @GetMapping
     public List<SeanceResponse> listerSeances() {
         return seanceService.listerToutesLesSeances().stream()
@@ -32,6 +34,7 @@ public class SeanceController {
     }
 
     @Operation(summary = "Afficher le détail d'une séance")
+    @SecurityRequirements
     @GetMapping("/{id}")
     public SeanceResponse trouverSeance(@PathVariable Long id) {
         Seance seance = seanceService.trouverParId(id);

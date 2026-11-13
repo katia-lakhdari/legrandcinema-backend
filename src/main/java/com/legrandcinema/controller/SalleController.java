@@ -5,6 +5,7 @@ import com.legrandcinema.dto.response.SalleResponse;
 import com.legrandcinema.entity.Salle;
 import com.legrandcinema.service.SalleService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ public class SalleController {
     }
 
     @Operation(summary = "Lister toutes les salles")
+    @SecurityRequirements
     @GetMapping
     public List<SalleResponse> listerSalles() {
         return salleService.listerToutesLesSalles().stream()
@@ -32,6 +34,7 @@ public class SalleController {
     }
 
     @Operation(summary = "Afficher le détail d'une salle")
+    @SecurityRequirements
     @GetMapping("/{id}")
     public SalleResponse trouverSalle(@PathVariable Long id) {
         Salle salle = salleService.trouverParId(id);
