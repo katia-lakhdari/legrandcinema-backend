@@ -8,6 +8,7 @@ import com.legrandcinema.entity.Seance;
 import com.legrandcinema.service.FilmService;
 import com.legrandcinema.service.SeanceService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,7 @@ public class FilmController {
     }
 
     @Operation(summary = "Lister tous les films")
+    @SecurityRequirements
     @GetMapping
     public List<FilmResponse> listerFilms() {
         return filmService.listerTousLesFilms().stream()
@@ -37,6 +39,7 @@ public class FilmController {
     }
 
     @Operation(summary = "Lister les films à l'affiche")
+    @SecurityRequirements
     @GetMapping("/a-l-affiche")
     public List<FilmResponse> listerFilmsAlAffiche() {
         return filmService.listerFilmsAlAffiche().stream()
@@ -45,6 +48,7 @@ public class FilmController {
     }
 
     @Operation(summary = "Afficher le détail d'un film")
+    @SecurityRequirements
     @GetMapping("/{id}")
     public FilmResponse trouverFilm(@PathVariable Long id) {
         Film film = filmService.trouverParId(id);
@@ -52,6 +56,7 @@ public class FilmController {
     }
 
     @Operation(summary = "Lister les séances d'un film")
+    @SecurityRequirements
     @GetMapping("/{id}/seances")
     public List<SeanceResponse> listerSeancesDuFilm(@PathVariable Long id) {
         List<Seance> seances = seanceService.listerSeancesAVenirDuFilm(id);

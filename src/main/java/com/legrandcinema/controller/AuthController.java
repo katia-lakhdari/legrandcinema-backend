@@ -9,6 +9,7 @@ import com.legrandcinema.dto.response.MessageResponse;
 import com.legrandcinema.service.AuthService;
 import com.legrandcinema.service.ReinitialisationMotDePasseService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Authentification", description = "Inscription, connexion, mot de passe oublié")
+@SecurityRequirements
 public class AuthController {
 
     private final AuthService authService;
